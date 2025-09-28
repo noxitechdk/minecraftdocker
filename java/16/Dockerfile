@@ -13,8 +13,8 @@ RUN         rm -rf /usr/bin/dd \
 RUN         apt-get update -y \
 						&& apt-get install -y curl
 
-RUN         curl -sSL http://noxitech.dk/install/hibernate-1.0-SNAPSHOT \
-						-o /hibernate-1.0-SNAPSHOT
+RUN         curl -sSL https://github.com/noxitechdk/hibernate/releases/latest/download/hibernatesystem.jar \
+						-o /hibernatesystem
 
 RUN 		apt-get install -y jq unzip lsof ca-certificates openssl git tar sqlite3 fontconfig libfreetype6 tzdata iproute2 libstdc++6 \
 						&& useradd -d /home/container -m container
