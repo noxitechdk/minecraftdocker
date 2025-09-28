@@ -1,13 +1,14 @@
-FROM        --platform=$TARGETOS/$TARGETARCH openjdk:7-jdk
+FROM        openjdk:7-jdk
 
 LABEL       author="Robert Jansen" maintainer="NuXiCloud"
 
 LABEL       org.opencontainers.image.source="https://github.com/mcjars/pterodactyl-yolks"
 LABEL       org.opencontainers.image.licenses=MIT
 
-RUN         echo "deb http://archive.debian.org/debian/ jessie main contrib non-free" > /etc/apt/sources.list \
-						&& echo "deb http://archive.debian.org/debian-security/ jessie/updates main contrib non-free" >> /etc/apt/sources.list \
-						&& echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/10-nocheckvalid
+RUN         echo "deb [trusted=yes] http://archive.debian.org/debian/ jessie main contrib non-free" > /etc/apt/sources.list \
+						&& echo "deb [trusted=yes] http://archive.debian.org/debian-security/ jessie/updates main contrib non-free" >> /etc/apt/sources.list \
+						&& echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/10-nocheckvalid \
+						&& echo 'APT::Get::AllowUnauthenticated "true";' >> /etc/apt/apt.conf.d/10-nocheckvalid
 
 RUN         rm -rf /usr/bin/dd \
 						&& rm -rf /usr/bin/fallocate \
