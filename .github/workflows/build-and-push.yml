@@ -1,0 +1,57 @@
+name: Build and Push Java Docker Images to Quay.io
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'java/**'
+  workflow_dispatch:
+
+env:
+  REGISTRY: quay.io
+  IMAGE_NAME: noxitechdk/minecraft-java
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        java_version: [7, 8, 11, 16, 17, 18, 19, 21, 22, 23, 24]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to Quay.io
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_PASSWORD }}
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=java${{ matrix.java_version }}
+            type=raw,value=java${{ matrix.java_version }}-latest
+            type=sha,prefix=java${{ matrix.java_version }}-
+      
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./java
+          file: ./java/${{ matrix.java_version }}/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
