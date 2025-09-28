@@ -10,7 +10,7 @@ export INTERNAL_IP
 
 # check if LOG_PREFIX is set
 if [ -z "$LOG_PREFIX" ]; then
-	LOG_PREFIX="\033[1m\033[33mnuxi@cloud~\033[0m"
+	LOG_PREFIX="\033[1m\033[33minstall~\033[0m"
 fi
 
 # Switch to the container's working directory
@@ -41,40 +41,45 @@ else
 	echo -e "${LOG_PREFIX} Skipping malware scan..."
 fi
 
-echo -e "${LOG_PREFIX} Installing Hibernate plugin..."
+# Auto-install Hibernate plugin (only if enabled)
+if [[ "${HIBERNATE_ENABLED:-1}" == "1" ]]; then
+	echo -e "${LOG_PREFIX} Installing Hibernate plugin..."
 
-mkdir -p plugins
+	mkdir -p plugins
 
-HIBERNATE_INSTALLED=false
+	HIBERNATE_INSTALLED=false
 
-if [[ -f "/hibernatesystem.jar" ]]; then
-	echo -e "${LOG_PREFIX} Found static Hibernate plugin, installing..."
-	cp /hibernatesystem.jar plugins/hibernatesystem.jar
-	HIBERNATE_INSTALLED=true
-fi
-
-echo -e "${LOG_PREFIX} Checking for latest Hibernate version from GitHub..."
-
-LATEST_URL=$(curl -s "https://api.github.com/repos/noxitechdk/Hibernate/releases/latest" | grep "browser_download_url.*\.jar" | head -n 1 | cut -d '"' -f 4)
-
-if [[ -n "$LATEST_URL" ]]; then
-	echo -e "${LOG_PREFIX} Downloading latest Hibernate plugin from: $LATEST_URL"
-
-	if curl -sL "$LATEST_URL" -o /tmp/hibernate-latest.jar; then
-		mv /tmp/hibernate-latest.jar plugins/hibernatesystem.jar
-		echo -e "${LOG_PREFIX} Latest Hibernate plugin installed successfully"
+	if [[ -f "/hibernatesystem.jar" ]]; then
+		echo -e "${LOG_PREFIX} Found static Hibernate plugin, installing..."
+		cp /hibernatesystem.jar plugins/hibernatesystem.jar
 		HIBERNATE_INSTALLED=true
+	fi
+
+	echo -e "${LOG_PREFIX} Checking for latest Hibernate version from GitHub..."
+
+	LATEST_URL=$(curl -s "https://api.github.com/repos/noxitechdk/Hibernate/releases/latest" | grep "browser_download_url.*\.jar" | head -n 1 | cut -d '"' -f 4)
+
+	if [[ -n "$LATEST_URL" ]]; then
+		echo -e "${LOG_PREFIX} Downloading latest Hibernate plugin from: $LATEST_URL"
+
+		if curl -sL "$LATEST_URL" -o /tmp/hibernate-latest.jar; then
+			mv /tmp/hibernate-latest.jar plugins/hibernatesystem.jar
+			echo -e "${LOG_PREFIX} Latest Hibernate plugin installed successfully"
+			HIBERNATE_INSTALLED=true
+		else
+			echo -e "${LOG_PREFIX} Failed to download latest version, using static version if available"
+		fi
 	else
-		echo -e "${LOG_PREFIX} Failed to download latest version, using static version if available"
+		echo -e "${LOG_PREFIX} Could not fetch latest release info, using static version if available"
+	fi
+
+	if [[ "$HIBERNATE_INSTALLED" == "true" ]]; then
+		echo -e "${LOG_PREFIX} Hibernate plugin installation completed"
+	else
+		echo -e "${LOG_PREFIX} No Hibernate plugin found to install"
 	fi
 else
-	echo -e "${LOG_PREFIX} Could not fetch latest release info, using static version if available"
-fi
-
-if [[ "$HIBERNATE_INSTALLED" == "true" ]]; then
-	echo -e "${LOG_PREFIX} Hibernate plugin installation completed"
-else
-	echo -e "${LOG_PREFIX} No Hibernate plugin found to install"
+	echo -e "${LOG_PREFIX} Hibernate plugin installation disabled (HIBERNATE_ENABLED=0)"
 fi
 
 if [[ "$AUTOMATIC_UPDATING" == "1" ]]; then
