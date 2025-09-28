@@ -2,7 +2,7 @@ FROM        --platform=$TARGETOS/$TARGETARCH eclipse-temurin:21-jdk
 
 LABEL       author="Robert Jansen" maintainer="NuXiCloud"
 
-LABEL       org.opencontainers.image.source="https://github.com/mcjars/pterodactyl-yolks"
+LABEL       org.opencontainers.image.source="https://github.com/noxitechdk/minecraftdocker"
 LABEL       org.opencontainers.image.licenses=MIT
 
 RUN         rm -rf /usr/bin/dd \

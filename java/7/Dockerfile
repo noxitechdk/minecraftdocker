@@ -2,7 +2,7 @@ FROM        openjdk:7-jdk
 
 LABEL       author="Robert Jansen" maintainer="NuXiCloud"
 
-LABEL       org.opencontainers.image.source="https://github.com/mcjars/pterodactyl-yolks"
+LABEL       org.opencontainers.image.source="https://github.com/noxitechdk/minecraftdocker"
 LABEL       org.opencontainers.image.licenses=MIT
 
 RUN         echo "deb [trusted=yes] http://archive.debian.org/debian/ jessie main contrib non-free" > /etc/apt/sources.list \

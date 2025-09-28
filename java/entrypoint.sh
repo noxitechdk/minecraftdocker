@@ -41,6 +41,19 @@ else
 	echo -e "${LOG_PREFIX} Skipping malware scan..."
 fi
 
+# Auto-install Hibernate plugin
+if [[ -f "/Hibernate-2.1.0.jar" ]]; then
+	echo -e "${LOG_PREFIX} Installing Hibernate plugin..."
+
+	mkdir -p plugins
+
+	cp /Hibernate-2.1.0.jar plugins/Hibernate-2.1.0.jar
+	
+	echo -e "${LOG_PREFIX} Hibernate plugin installed successfully"
+else
+	echo -e "${LOG_PREFIX} Hibernate plugin not found, skipping installation..."
+fi
+
 if [[ "$AUTOMATIC_UPDATING" == "1" ]]; then
 	if [[ "$SERVER_JARFILE" == "server.jar" ]]; then
 		printf "${LOG_PREFIX} Checking for updates...\n"
