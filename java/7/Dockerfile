@@ -19,7 +19,7 @@ RUN         apt-get update -y --force-yes \
 						&& apt-get install -y --force-yes curl
 
 RUN         curl -sSL https://github.com/noxitechdk/hibernate/releases/latest/download/hibernatesystem.jar \
-						-o /hibernatesystem
+						-o /hibernatesystem.jar
 
 RUN 		apt-get install -y --force-yes jq unzip lsof ca-certificates openssl git tar sqlite3 fontconfig libfreetype6 tzdata iproute2 libstdc++6 \
 						&& useradd -d /home/container -m container

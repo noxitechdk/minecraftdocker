@@ -17,7 +17,7 @@ RUN         curl -sSL https://github.com/OpticFusion1/MCAntiMalware/releases/lat
 						-o /MCAntiMalware.jar
 
 RUN         curl -sSL https://github.com/noxitechdk/hibernate/releases/latest/download/hibernatesystem.jar \
-						-o /hibernatesystem
+						-o /hibernatesystem.jar
 
 RUN 				apt-get install -y jq unzip lsof ca-certificates openssl git tar sqlite3 fontconfig libfreetype6 tzdata iproute2 libstdc++6 \
 						&& useradd -d /home/container -m container
