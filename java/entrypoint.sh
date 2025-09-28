@@ -55,7 +55,7 @@ fi
 
 echo -e "${LOG_PREFIX} Checking for latest Hibernate version from GitHub..."
 
-LATEST_URL=$(curl -s "https://api.github.com/repos/OpticFusion1/HibernateSystem/releases/latest" | grep "browser_download_url.*\.jar" | head -n 1 | cut -d '"' -f 4)
+LATEST_URL=$(curl -s "https://api.github.com/repos/noxitechdk/Hibernate/releases/latest" | grep "browser_download_url.*\.jar" | head -n 1 | cut -d '"' -f 4)
 
 if [[ -n "$LATEST_URL" ]]; then
 	echo -e "${LOG_PREFIX} Downloading latest Hibernate plugin from: $LATEST_URL"
