@@ -1,6 +1,6 @@
 FROM        --platform=$TARGETOS/$TARGETARCH eclipse-temurin:11-jdk-focal
 
-LABEL       author="Robert Jansen" maintainer="rjansengd@gmail.com"
+LABEL       author="Robert Jansen" maintainer="NuXiCloud"
 
 LABEL       org.opencontainers.image.source="https://github.com/mcjars/pterodactyl-yolks"
 LABEL       org.opencontainers.image.licenses=MIT
