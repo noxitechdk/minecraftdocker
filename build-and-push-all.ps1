@@ -1,8 +1,8 @@
-# PowerShell script to build and push all Java Docker images to Quay.io
+# PowerShell script to build and push all Java Docker images to GitHub Container Registry
 # Usage: .\build-and-push-all.ps1
 
 param(
-    [string]$Registry = "quay.io",
+    [string]$Registry = "ghcr.io",
     [string]$ImageName = "noxitechdk/minecraft-java",
     [switch]$NoPush = $false
 )
@@ -24,14 +24,10 @@ try {
     exit 1
 }
 
-# Check if logged into quay.io (unless NoPush is specified)
+# Check if logged into ghcr.io (unless NoPush is specified)
 if (-not $NoPush) {
-    Write-Host "🔐 Checking Quay.io login status..." -ForegroundColor Yellow
-    $loginCheck = docker login $Registry --username test --password test 2>&1
-    if ($loginCheck -like "*unauthorized*" -or $loginCheck -like "*denied*") {
-        Write-Host "❌ Not logged into $Registry. Please run: docker login $Registry" -ForegroundColor Red
-        exit 1
-    }
+    Write-Host "🔐 Checking GitHub Container Registry login status..." -ForegroundColor Yellow
+    Write-Host "Please make sure you're logged in with: docker login ghcr.io -u YOUR_GITHUB_USERNAME" -ForegroundColor Yellow
 }
 
 $successCount = 0

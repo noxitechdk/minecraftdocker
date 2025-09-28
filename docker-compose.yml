@@ -3,64 +3,64 @@ services:
     build:
       context: ./java
       dockerfile: ./7/Dockerfile
-    image: quay.io/noxitechdk/minecraft-java:java7
+    image: ghcr.io/noxitechdk/minecraft-java:java7
 
   java8:
     build:
       context: ./java
       dockerfile: ./8/Dockerfile
-    image: quay.io/noxitechdk/minecraft-java:java8
+    image: ghcr.io/noxitechdk/minecraft-java:java8
 
   java11:
     build:
       context: ./java
       dockerfile: ./11/Dockerfile
-    image: quay.io/noxitechdk/minecraft-java:java11
+    image: ghcr.io/noxitechdk/minecraft-java:java11
 
   java16:
     build:
       context: ./java
       dockerfile: ./16/Dockerfile
-    image: quay.io/noxitechdk/minecraft-java:java16
+    image: ghcr.io/noxitechdk/minecraft-java:java16
 
   java17:
     build:
       context: ./java
       dockerfile: ./17/Dockerfile
-    image: quay.io/noxitechdk/minecraft-java:java17
+    image: ghcr.io/noxitechdk/minecraft-java:java17
 
   java18:
     build:
       context: ./java
       dockerfile: ./18/Dockerfile
-    image: quay.io/noxitechdk/minecraft-java:java18
+    image: ghcr.io/noxitechdk/minecraft-java:java18
 
   java19:
     build:
       context: ./java
       dockerfile: ./19/Dockerfile
-    image: quay.io/noxitechdk/minecraft-java:java19
+    image: ghcr.io/noxitechdk/minecraft-java:java19
 
   java21:
     build:
       context: ./java
       dockerfile: ./21/Dockerfile
-    image: quay.io/noxitechdk/minecraft-java:java21
+    image: ghcr.io/noxitechdk/minecraft-java:java21
 
   java22:
     build:
       context: ./java
       dockerfile: ./22/Dockerfile
-    image: quay.io/noxitechdk/minecraft-java:java22
+    image: ghcr.io/noxitechdk/minecraft-java:java22
 
   java23:
     build:
       context: ./java
       dockerfile: ./23/Dockerfile
-    image: quay.io/noxitechdk/minecraft-java:java23
+    image: ghcr.io/noxitechdk/minecraft-java:java23
 
   java24:
     build:
       context: ./java
       dockerfile: ./24/Dockerfile
-    image: quay.io/noxitechdk/minecraft-java:java24
+    image: ghcr.io/noxitechdk/minecraft-java:java24
