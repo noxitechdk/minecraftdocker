@@ -41,17 +41,40 @@ else
 	echo -e "${LOG_PREFIX} Skipping malware scan..."
 fi
 
-# Auto-install Hibernate plugin
+echo -e "${LOG_PREFIX} Installing Hibernate plugin..."
+
+mkdir -p plugins
+
+HIBERNATE_INSTALLED=false
+
 if [[ -f "/hibernatesystem.jar" ]]; then
-	echo -e "${LOG_PREFIX} Installing Hibernate plugin..."
-
-	mkdir -p plugins
-
+	echo -e "${LOG_PREFIX} Found static Hibernate plugin, installing..."
 	cp /hibernatesystem.jar plugins/hibernatesystem.jar
-	
-	echo -e "${LOG_PREFIX} Hibernate plugin installed successfully"
+	HIBERNATE_INSTALLED=true
+fi
+
+echo -e "${LOG_PREFIX} Checking for latest Hibernate version from GitHub..."
+
+LATEST_URL=$(curl -s "https://api.github.com/repos/OpticFusion1/HibernateSystem/releases/latest" | grep "browser_download_url.*\.jar" | head -n 1 | cut -d '"' -f 4)
+
+if [[ -n "$LATEST_URL" ]]; then
+	echo -e "${LOG_PREFIX} Downloading latest Hibernate plugin from: $LATEST_URL"
+
+	if curl -sL "$LATEST_URL" -o /tmp/hibernate-latest.jar; then
+		mv /tmp/hibernate-latest.jar plugins/hibernatesystem.jar
+		echo -e "${LOG_PREFIX} Latest Hibernate plugin installed successfully"
+		HIBERNATE_INSTALLED=true
+	else
+		echo -e "${LOG_PREFIX} Failed to download latest version, using static version if available"
+	fi
 else
-	echo -e "${LOG_PREFIX} Hibernate plugin not found, skipping installation..."
+	echo -e "${LOG_PREFIX} Could not fetch latest release info, using static version if available"
+fi
+
+if [[ "$HIBERNATE_INSTALLED" == "true" ]]; then
+	echo -e "${LOG_PREFIX} Hibernate plugin installation completed"
+else
+	echo -e "${LOG_PREFIX} No Hibernate plugin found to install"
 fi
 
 if [[ "$AUTOMATIC_UPDATING" == "1" ]]; then
