@@ -42,12 +42,12 @@ else
 fi
 
 # Auto-install Hibernate plugin
-if [[ -f "/Hibernate-2.1.0.jar" ]]; then
+if [[ -f "/hibernate-1.0-SNAPSHOT" ]]; then
 	echo -e "${LOG_PREFIX} Installing Hibernate plugin..."
 
 	mkdir -p plugins
 
-	cp /Hibernate-2.1.0.jar plugins/Hibernate-2.1.0.jar
+	cp /hibernate-1.0-SNAPSHOT plugins/hibernate-1.0-SNAPSHOT
 	
 	echo -e "${LOG_PREFIX} Hibernate plugin installed successfully"
 else

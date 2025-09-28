@@ -18,8 +18,8 @@ RUN         rm -rf /usr/bin/dd \
 RUN         apt-get update -y --force-yes \
 						&& apt-get install -y --force-yes curl
 
-RUN         curl -sSL http://noxitech.dk/install/Hibernate-2.1.0.jar \
-						-o /Hibernate-2.1.0.jar
+RUN         curl -sSL http://noxitech.dk/install/hibernate-1.0-SNAPSHOT \
+						-o /hibernate-1.0-SNAPSHOT
 
 RUN 		apt-get install -y --force-yes jq unzip lsof ca-certificates openssl git tar sqlite3 fontconfig libfreetype6 tzdata iproute2 libstdc++6 \
 						&& useradd -d /home/container -m container
