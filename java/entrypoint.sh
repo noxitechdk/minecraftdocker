@@ -131,6 +131,10 @@ session.lock
 temp/
 .console_history
 github-sync-errors.log
+backup-*/
+
+# Paper remapped files
+plugins/.paper-remapped/
 
 # Keep only plugins and configs
 !plugins/
@@ -168,6 +172,33 @@ EOF
 				fi
 			elif echo "$pull_output" | grep -q "fatal: couldn't find remote ref"; then
 				log_github_error "PULL" "Main branch not found in repository. Repository may be empty."
+			elif echo "$pull_output" | grep -q "would be overwritten by merge"; then
+				echo -e "${LOG_PREFIX} Untracked files conflict detected. Backing up and resolving..."
+
+				backup_dir="backup-$(date '+%Y%m%d-%H%M%S')"
+				mkdir -p "$backup_dir"
+
+				conflicting_files=$(echo "$pull_output" | grep -A 100 "would be overwritten by merge:" | grep -E "^\s+" | sed 's/^[[:space:]]*//' | grep -v "Please move or remove")
+				
+				echo -e "${LOG_PREFIX} Backing up conflicting files to $backup_dir..."
+				for file in $conflicting_files; do
+					if [[ -f "$file" ]]; then
+						backup_file_dir="$backup_dir/$(dirname "$file")"
+						mkdir -p "$backup_file_dir" 2>/dev/null || true
+						cp "$file" "$backup_dir/$file" 2>/dev/null || true
+						echo -e "${LOG_PREFIX} Backed up: $file"
+					fi
+				done
+
+				echo "$backup_dir/" >> .gitignore
+
+				echo -e "${LOG_PREFIX} Resetting to match remote repository..."
+				if git fetch origin main && git reset --hard origin/main 2>/dev/null; then
+					echo -e "${LOG_PREFIX} Successfully synced with remote repository"
+					echo -e "${LOG_PREFIX} Your local files have been backed up to: $backup_dir"
+				else
+					log_github_error "PULL" "Failed to force sync with remote repository"
+				fi
 			else
 				log_github_error "PULL" "Pull failed with error: $pull_output"
 			fi
