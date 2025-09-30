@@ -163,6 +163,46 @@
             "field_type": "text"
         },
         {
+            "name": "GitHub Sync Repository",
+            "description": "GitHub repository for syncing plugins and configs (format: username\/repository). Leave empty to disable sync.",
+            "env_variable": "GITHUB_SYNC_REPO",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|regex:\/^[a-zA-Z0-9._-]+\\\/[a-zA-Z0-9._-]+$\/",
+            "field_type": "text"
+        },
+        {
+            "name": "GitHub Access Token",
+            "description": "GitHub Personal Access Token with repository permissions. Create at: https:\/\/github.com\/settings\/tokens",
+            "env_variable": "GITHUB_SYNC_TOKEN",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|min:40|max:100",
+            "field_type": "text"
+        },
+        {
+            "name": "GitHub Username",
+            "description": "GitHub username for commits (optional, defaults to 'minecraft-server')",
+            "env_variable": "GITHUB_SYNC_USERNAME",
+            "default_value": "minecraft-server",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:50",
+            "field_type": "text"
+        },
+        {
+            "name": "GitHub Email",
+            "description": "Email for GitHub commits (optional, defaults to 'server@minecraft.com')",
+            "env_variable": "GITHUB_SYNC_EMAIL",
+            "default_value": "server@minecraft.com",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|email|max:100",
+            "field_type": "text"
+        },
+        {
             "name": "Software",
             "description": "The Software thats installed when the server gets reinstalled, mainly for use with billing panels, not users. (check https:\/\/versions.mcjars.app\/#model\/types) for all types!",
             "env_variable": "SOFTWARE",

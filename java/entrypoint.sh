@@ -41,6 +41,111 @@ else
 	echo -e "${LOG_PREFIX} Skipping malware scan..."
 fi
 
+if [[ -n "${GITHUB_SYNC_REPO}" && -n "${GITHUB_SYNC_TOKEN}" ]]; then
+	echo -e "${LOG_PREFIX} GitHub Sync enabled - Setting up repository sync..."
+
+	git config --global user.name "${GITHUB_SYNC_USERNAME:-minecraft-server}"
+	git config --global user.email "${GITHUB_SYNC_EMAIL:-server@minecraft.com}"
+	git config --global init.defaultBranch main
+
+	if [[ ! -d ".git" ]]; then
+		echo -e "${LOG_PREFIX} Initializing GitHub sync repository..."
+
+		if git clone "https://${GITHUB_SYNC_TOKEN}@github.com/${GITHUB_SYNC_REPO}.git" /tmp/sync-repo 2>/dev/null; then
+			echo -e "${LOG_PREFIX} Repository found, syncing existing data..."
+
+			if [[ -d "/tmp/sync-repo/plugins" ]]; then
+				mkdir -p plugins
+				cp -r /tmp/sync-repo/plugins/* plugins/ 2>/dev/null || true
+				echo -e "${LOG_PREFIX} Synced plugins from repository"
+			fi
+
+			for config_file in server.properties spigot.yml bukkit.yml paper.yml config.yml settings.yml velocity.toml; do
+				if [[ -f "/tmp/sync-repo/$config_file" ]]; then
+					cp "/tmp/sync-repo/$config_file" "./$config_file"
+					echo -e "${LOG_PREFIX} Synced $config_file from repository"
+				fi
+			done
+
+			for config_dir in config world world_nether world_the_end; do
+				if [[ -d "/tmp/sync-repo/$config_dir" ]]; then
+					cp -r "/tmp/sync-repo/$config_dir" "./" 2>/dev/null || true
+					echo -e "${LOG_PREFIX} Synced $config_dir from repository"
+				fi
+			done
+
+			git init
+			git remote add origin "https://${GITHUB_SYNC_TOKEN}@github.com/${GITHUB_SYNC_REPO}.git"
+
+			rm -rf /tmp/sync-repo
+		else
+			echo -e "${LOG_PREFIX} Repository not found, will create initial sync later..."
+			git init
+			git remote add origin "https://${GITHUB_SYNC_TOKEN}@github.com/${GITHUB_SYNC_REPO}.git"
+		fi
+
+		cat > .gitignore << 'EOF'
+# Server files to ignore
+*.jar
+*.log
+logs/
+cache/
+crash-reports/
+libraries/
+versions/
+banned-*.json
+ops.json
+whitelist.json
+usernamecache.json
+usercache.json
+session.lock
+*.pid
+temp/
+.console_history
+
+# Keep only plugins and configs
+!plugins/
+!*.properties
+!*.yml
+!*.yaml
+!*.toml
+!config/
+!world/
+!world_nether/
+!world_the_end/
+EOF
+
+		echo -e "${LOG_PREFIX} GitHub sync repository initialized"
+	else
+		echo -e "${LOG_PREFIX} Git repository already exists, pulling latest changes..."
+		git pull origin main 2>/dev/null || echo -e "${LOG_PREFIX} Pull failed or first time setup"
+	fi
+
+	(
+		while true; do
+			sleep 600
+
+			git add plugins/ *.properties *.yml *.yaml *.toml config/ world/ world_nether/ world_the_end/ 2>/dev/null || true
+			
+			if ! git diff --cached --quiet 2>/dev/null; then
+				git commit -m "Auto-sync: $(date '+%Y-%m-%d %H:%M:%S UTC')" 2>/dev/null
+				
+				if git push origin main 2>/dev/null; then
+					echo "$(date '+%Y-%m-%d %H:%M:%S') - GitHub sync: Changes pushed successfully" >> sync.log
+				else
+					echo "$(date '+%Y-%m-%d %H:%M:%S') - GitHub sync: Push failed" >> sync.log
+				fi
+			else
+				echo "$(date '+%Y-%m-%d %H:%M:%S') - GitHub sync: No changes to sync" >> sync.log
+			fi
+		done
+	) &
+	
+	echo -e "${LOG_PREFIX} GitHub sync background process started (10-minute intervals)"
+else
+	echo -e "${LOG_PREFIX} GitHub sync disabled (GITHUB_SYNC_REPO not configured)"
+fi
+
 # Auto-install Hibernate plugin (only if enabled)
 if [[ "${HIBERNATE_ENABLED:-1}" == "1" ]]; then
 	echo -e "${LOG_PREFIX} Installing Hibernate plugin..."
