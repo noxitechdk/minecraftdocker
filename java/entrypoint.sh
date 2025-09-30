@@ -48,29 +48,47 @@ if [[ -n "${GITHUB_SYNC_REPO}" && -n "${GITHUB_SYNC_TOKEN}" ]]; then
 	git config --global user.email "${GITHUB_SYNC_EMAIL:-server@minecraft.com}"
 	git config --global init.defaultBranch main
 
+	log_github_error() {
+		local operation="$1"
+		local error_output="$2"
+		echo -e "${LOG_PREFIX} GitHub Sync Error [$operation]: $error_output" | tee -a github-sync-errors.log
+	}
+	
 	if [[ ! -d ".git" ]]; then
 		echo -e "${LOG_PREFIX} Initializing GitHub sync repository..."
 
-		if git clone "https://${GITHUB_SYNC_TOKEN}@github.com/${GITHUB_SYNC_REPO}.git" /tmp/sync-repo 2>/dev/null; then
+		clone_output=$(git clone "https://${GITHUB_SYNC_TOKEN}@github.com/${GITHUB_SYNC_REPO}.git" /tmp/sync-repo 2>&1)
+		clone_result=$?
+		
+		if [[ $clone_result -eq 0 ]]; then
 			echo -e "${LOG_PREFIX} Repository found, syncing existing data..."
 
 			if [[ -d "/tmp/sync-repo/plugins" ]]; then
 				mkdir -p plugins
-				cp -r /tmp/sync-repo/plugins/* plugins/ 2>/dev/null || true
-				echo -e "${LOG_PREFIX} Synced plugins from repository"
+				if cp -r /tmp/sync-repo/plugins/* plugins/ 2>/dev/null; then
+					echo -e "${LOG_PREFIX} Synced plugins from repository"
+				else
+					echo -e "${LOG_PREFIX} Warning: Failed to copy some plugin files"
+				fi
 			fi
 
 			for config_file in server.properties spigot.yml bukkit.yml paper.yml config.yml settings.yml velocity.toml; do
 				if [[ -f "/tmp/sync-repo/$config_file" ]]; then
-					cp "/tmp/sync-repo/$config_file" "./$config_file"
-					echo -e "${LOG_PREFIX} Synced $config_file from repository"
+					if cp "/tmp/sync-repo/$config_file" "./$config_file" 2>/dev/null; then
+						echo -e "${LOG_PREFIX} Synced $config_file from repository"
+					else
+						echo -e "${LOG_PREFIX} Warning: Failed to sync $config_file"
+					fi
 				fi
 			done
 
 			for config_dir in config world world_nether world_the_end; do
 				if [[ -d "/tmp/sync-repo/$config_dir" ]]; then
-					cp -r "/tmp/sync-repo/$config_dir" "./" 2>/dev/null || true
-					echo -e "${LOG_PREFIX} Synced $config_dir from repository"
+					if cp -r "/tmp/sync-repo/$config_dir" "./" 2>/dev/null; then
+						echo -e "${LOG_PREFIX} Synced $config_dir from repository"
+					else
+						echo -e "${LOG_PREFIX} Warning: Failed to sync $config_dir directory"
+					fi
 				fi
 			done
 
@@ -79,7 +97,17 @@ if [[ -n "${GITHUB_SYNC_REPO}" && -n "${GITHUB_SYNC_TOKEN}" ]]; then
 
 			rm -rf /tmp/sync-repo
 		else
-			echo -e "${LOG_PREFIX} Repository not found, will create initial sync later..."
+			if echo "$clone_output" | grep -q "not found"; then
+				log_github_error "CLONE" "Repository '${GITHUB_SYNC_REPO}' not found. Please check repository name and permissions."
+			elif echo "$clone_output" | grep -q "Permission denied\|Authentication failed"; then
+				log_github_error "CLONE" "Authentication failed. Please check your GitHub token permissions."
+			elif echo "$clone_output" | grep -q "Could not resolve host"; then
+				log_github_error "CLONE" "Network error: Cannot reach GitHub. Check internet connection."
+			else
+				log_github_error "CLONE" "Unknown clone error: $clone_output"
+			fi
+
+			echo -e "${LOG_PREFIX} Repository clone failed, initializing empty repository for future sync..."
 			git init
 			git remote add origin "https://${GITHUB_SYNC_TOKEN}@github.com/${GITHUB_SYNC_REPO}.git"
 		fi
@@ -102,6 +130,7 @@ session.lock
 *.pid
 temp/
 .console_history
+github-sync-errors.log
 
 # Keep only plugins and configs
 !plugins/
@@ -118,7 +147,31 @@ EOF
 		echo -e "${LOG_PREFIX} GitHub sync repository initialized"
 	else
 		echo -e "${LOG_PREFIX} Git repository already exists, pulling latest changes..."
-		git pull origin main 2>/dev/null || echo -e "${LOG_PREFIX} Pull failed or first time setup"
+
+		pull_output=$(git pull origin main 2>&1)
+		pull_result=$?
+		
+		if [[ $pull_result -eq 0 ]]; then
+			echo -e "${LOG_PREFIX} Successfully pulled latest changes from repository"
+		else
+			if echo "$pull_output" | grep -q "Permission denied\|Authentication failed"; then
+				log_github_error "PULL" "Authentication failed during pull. Token may be expired or invalid."
+			elif echo "$pull_output" | grep -q "Could not resolve host"; then
+				log_github_error "PULL" "Network error during pull: Cannot reach GitHub."
+			elif echo "$pull_output" | grep -q "refusing to merge unrelated histories"; then
+				log_github_error "PULL" "Repository history conflict. May need manual intervention."
+				echo -e "${LOG_PREFIX} Attempting to resolve with --allow-unrelated-histories..."
+				if git pull origin main --allow-unrelated-histories 2>/dev/null; then
+					echo -e "${LOG_PREFIX} Successfully resolved history conflict"
+				else
+					log_github_error "PULL" "Failed to resolve history conflict"
+				fi
+			elif echo "$pull_output" | grep -q "fatal: couldn't find remote ref"; then
+				log_github_error "PULL" "Main branch not found in repository. Repository may be empty."
+			else
+				log_github_error "PULL" "Pull failed with error: $pull_output"
+			fi
+		fi
 	fi
 
 	(
@@ -128,12 +181,28 @@ EOF
 			git add plugins/ *.properties *.yml *.yaml *.toml config/ world/ world_nether/ world_the_end/ 2>/dev/null || true
 			
 			if ! git diff --cached --quiet 2>/dev/null; then
-				git commit -m "Auto-sync: $(date '+%Y-%m-%d %H:%M:%S UTC')" 2>/dev/null
-				
-				if git push origin main 2>/dev/null; then
-					echo "$(date '+%Y-%m-%d %H:%M:%S') - GitHub sync: Changes pushed successfully" >> sync.log
+				commit_output=$(git commit -m "Auto-sync: $(date '+%Y-%m-%d %H:%M:%S UTC')" 2>&1)
+				commit_result=$?
+
+				if [[ $commit_result -eq 0 ]]; then
+					push_output=$(git push origin main 2>&1)
+					push_result=$?
+					
+					if [[ $push_result -eq 0 ]]; then
+						echo "$(date '+%Y-%m-%d %H:%M:%S') - GitHub sync: Changes pushed successfully" >> sync.log
+					else
+						if echo "$push_output" | grep -q "Permission denied\|Authentication failed"; then
+							echo "$(date '+%Y-%m-%d %H:%M:%S') - GitHub sync: Push failed - Authentication error" >> sync.log
+						elif echo "$push_output" | grep -q "Could not resolve host"; then
+							echo "$(date '+%Y-%m-%d %H:%M:%S') - GitHub sync: Push failed - Network error" >> sync.log
+						elif echo "$push_output" | grep -q "rejected"; then
+							echo "$(date '+%Y-%m-%d %H:%M:%S') - GitHub sync: Push rejected - May need to pull first" >> sync.log
+						else
+							echo "$(date '+%Y-%m-%d %H:%M:%S') - GitHub sync: Push failed - $push_output" >> sync.log
+						fi
+					fi
 				else
-					echo "$(date '+%Y-%m-%d %H:%M:%S') - GitHub sync: Push failed" >> sync.log
+					echo "$(date '+%Y-%m-%d %H:%M:%S') - GitHub sync: Commit failed - $commit_output" >> sync.log
 				fi
 			else
 				echo "$(date '+%Y-%m-%d %H:%M:%S') - GitHub sync: No changes to sync" >> sync.log
@@ -142,6 +211,7 @@ EOF
 	) &
 	
 	echo -e "${LOG_PREFIX} GitHub sync background process started (10-minute intervals)"
+	echo -e "${LOG_PREFIX} Check 'sync.log' and 'github-sync-errors.log' for detailed sync status"
 else
 	echo -e "${LOG_PREFIX} GitHub sync disabled (GITHUB_SYNC_REPO not configured)"
 fi
