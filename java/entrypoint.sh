@@ -114,7 +114,6 @@ if [[ -n "${GITHUB_SYNC_REPO}" && -n "${GITHUB_SYNC_TOKEN}" ]]; then
 
 		cat > .gitignore << 'EOF'
 # Server files to ignore
-*.jar
 *.log
 logs/
 cache/
@@ -204,45 +203,8 @@ EOF
 			fi
 		fi
 	fi
-
-	(
-		while true; do
-			sleep 600
-
-			git add plugins/ *.properties *.yml *.yaml *.toml config/ world/ world_nether/ world_the_end/ 2>/dev/null || true
-			
-			if ! git diff --cached --quiet 2>/dev/null; then
-				commit_output=$(git commit -m "Auto-sync: $(date '+%Y-%m-%d %H:%M:%S UTC')" 2>&1)
-				commit_result=$?
-
-				if [[ $commit_result -eq 0 ]]; then
-					push_output=$(git push origin main 2>&1)
-					push_result=$?
-					
-					if [[ $push_result -eq 0 ]]; then
-						echo "$(date '+%Y-%m-%d %H:%M:%S') - GitHub sync: Changes pushed successfully" >> sync.log
-					else
-						if echo "$push_output" | grep -q "Permission denied\|Authentication failed"; then
-							echo "$(date '+%Y-%m-%d %H:%M:%S') - GitHub sync: Push failed - Authentication error" >> sync.log
-						elif echo "$push_output" | grep -q "Could not resolve host"; then
-							echo "$(date '+%Y-%m-%d %H:%M:%S') - GitHub sync: Push failed - Network error" >> sync.log
-						elif echo "$push_output" | grep -q "rejected"; then
-							echo "$(date '+%Y-%m-%d %H:%M:%S') - GitHub sync: Push rejected - May need to pull first" >> sync.log
-						else
-							echo "$(date '+%Y-%m-%d %H:%M:%S') - GitHub sync: Push failed - $push_output" >> sync.log
-						fi
-					fi
-				else
-					echo "$(date '+%Y-%m-%d %H:%M:%S') - GitHub sync: Commit failed - $commit_output" >> sync.log
-				fi
-			else
-				echo "$(date '+%Y-%m-%d %H:%M:%S') - GitHub sync: No changes to sync" >> sync.log
-			fi
-		done
-	) &
 	
-	echo -e "${LOG_PREFIX} GitHub sync background process started (10-minute intervals)"
-	echo -e "${LOG_PREFIX} Check 'sync.log' and 'github-sync-errors.log' for detailed sync status"
+	echo -e "${LOG_PREFIX} GitHub sync setup completed (pull-only mode)"
 else
 	echo -e "${LOG_PREFIX} GitHub sync disabled (GITHUB_SYNC_REPO not configured)"
 fi
