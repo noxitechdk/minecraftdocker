@@ -205,6 +205,113 @@ EOF
 	fi
 	
 	echo -e "${LOG_PREFIX} GitHub sync setup completed (pull-only mode)"
+
+	if [[ "${GITHUB_SYNC_ENABLED:-0}" == "1" ]]; then
+		cat > github-sync.sh << 'SYNC_SCRIPT'
+#!/bin/bash
+
+# Manual GitHub Sync Script
+# Usage: ./github-sync.sh
+
+LOG_PREFIX="\033[1m\033[32mgithub-sync~\033[0m"
+
+echo -e "${LOG_PREFIX} Starting manual GitHub sync..."
+
+# Function for detailed error logging
+log_github_error() {
+	local operation="$1"
+	local error_output="$2"
+	echo -e "${LOG_PREFIX} GitHub Sync Error [$operation]: $error_output" | tee -a github-sync-errors.log
+}
+
+# Check if GitHub sync is configured
+if [[ -z "${GITHUB_SYNC_REPO}" || -z "${GITHUB_SYNC_TOKEN}" ]]; then
+	echo -e "${LOG_PREFIX} Error: GitHub sync not configured. Please set GITHUB_SYNC_REPO and GITHUB_SYNC_TOKEN."
+	exit 1
+fi
+
+if [[ ! -d ".git" ]]; then
+	echo -e "${LOG_PREFIX} Error: Git repository not initialized. Restart server to initialize GitHub sync."
+	exit 1
+fi
+
+echo -e "${LOG_PREFIX} Pulling latest changes from repository..."
+
+# Try to pull with detailed error handling
+pull_output=$(git pull origin main 2>&1)
+pull_result=$?
+
+if [[ $pull_result -eq 0 ]]; then
+	echo -e "${LOG_PREFIX} Successfully pulled latest changes from repository"
+	
+	# Check what files were updated
+	if echo "$pull_output" | grep -q "files changed\|insertions\|deletions"; then
+		echo -e "${LOG_PREFIX} Files updated:"
+		echo "$pull_output" | grep -E "(\.jar|\.yml|\.yaml|\.properties|\.toml)" || echo -e "${LOG_PREFIX} No plugin/config files were updated"
+		
+		# Reload plugins if any .jar files in plugins/ directory were updated
+		if echo "$pull_output" | grep -q "plugins/.*\.jar"; then
+			echo -e "${LOG_PREFIX} Plugin files updated - consider reloading plugins with '/reload' or '/plugman reload'"
+		fi
+		
+		# Notify about config changes
+		if echo "$pull_output" | grep -q "\(\.yml\|\.yaml\|\.properties\|\.toml\)"; then
+			echo -e "${LOG_PREFIX} Configuration files updated - some changes may require server restart"
+		fi
+	else
+		echo -e "${LOG_PREFIX} Repository is up to date, no changes to pull"
+	fi
+else
+	# Handle pull errors
+	if echo "$pull_output" | grep -q "Permission denied\|Authentication failed"; then
+		log_github_error "PULL" "Authentication failed during pull. Token may be expired or invalid."
+	elif echo "$pull_output" | grep -q "Could not resolve host"; then
+		log_github_error "PULL" "Network error during pull: Cannot reach GitHub."
+	elif echo "$pull_output" | grep -q "would be overwritten by merge"; then
+		echo -e "${LOG_PREFIX} Untracked files conflict detected. Backing up and resolving..."
+		
+		# Create backup directory with timestamp
+		backup_dir="backup-$(date '+%Y%m%d-%H%M%S')"
+		mkdir -p "$backup_dir"
+		
+		# Extract conflicting files from git output and back them up
+		conflicting_files=$(echo "$pull_output" | grep -A 100 "would be overwritten by merge:" | grep -E "^\s+" | sed 's/^[[:space:]]*//' | grep -v "Please move or remove")
+		
+		echo -e "${LOG_PREFIX} Backing up conflicting files to $backup_dir..."
+		for file in $conflicting_files; do
+			if [[ -f "$file" ]]; then
+				# Create directory structure in backup
+				backup_file_dir="$backup_dir/$(dirname "$file")"
+				mkdir -p "$backup_file_dir" 2>/dev/null || true
+				cp "$file" "$backup_dir/$file" 2>/dev/null || true
+				echo -e "${LOG_PREFIX} Backed up: $file"
+			fi
+		done
+		
+		# Add backup directory to gitignore
+		echo "$backup_dir/" >> .gitignore
+		
+		# Force reset to match remote
+		echo -e "${LOG_PREFIX} Resetting to match remote repository..."
+		if git fetch origin main && git reset --hard origin/main 2>/dev/null; then
+			echo -e "${LOG_PREFIX} Successfully synced with remote repository"
+			echo -e "${LOG_PREFIX} Your local files have been backed up to: $backup_dir"
+			echo -e "${LOG_PREFIX} Consider restarting server to apply all changes"
+		else
+			log_github_error "PULL" "Failed to force sync with remote repository"
+		fi
+	else
+		log_github_error "PULL" "Pull failed with error: $pull_output"
+	fi
+fi
+
+echo -e "${LOG_PREFIX} Manual sync completed"
+SYNC_SCRIPT
+
+		chmod +x github-sync.sh
+		echo -e "${LOG_PREFIX} Manual sync script created: ./github-sync.sh"
+		echo -e "${LOG_PREFIX} Use './github-sync.sh' to manually sync from GitHub while server is running"
+	fi
 else
 	if [[ "${GITHUB_SYNC_ENABLED:-0}" == "0" ]]; then
 		echo -e "${LOG_PREFIX} GitHub sync disabled (GITHUB_SYNC_ENABLED=0)"
