@@ -163,6 +163,16 @@
             "field_type": "text"
         },
         {
+            "name": "GitHub Sync Enabled",
+            "description": "Enable GitHub synchronization for plugins and configs. Disable this to skip GitHub sync entirely.",
+            "env_variable": "GITHUB_SYNC_ENABLED",
+            "default_value": "0",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|boolean",
+            "field_type": "text"
+        },
+        {
             "name": "GitHub Sync Repository",
             "description": "GitHub repository for syncing plugins and configs (format: username\/repository). Leave empty to disable sync.",
             "env_variable": "GITHUB_SYNC_REPO",

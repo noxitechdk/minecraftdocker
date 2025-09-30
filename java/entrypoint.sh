@@ -41,7 +41,7 @@ else
 	echo -e "${LOG_PREFIX} Skipping malware scan..."
 fi
 
-if [[ -n "${GITHUB_SYNC_REPO}" && -n "${GITHUB_SYNC_TOKEN}" ]]; then
+if [[ "${GITHUB_SYNC_ENABLED:-0}" == "1" && -n "${GITHUB_SYNC_REPO}" && -n "${GITHUB_SYNC_TOKEN}" ]]; then
 	echo -e "${LOG_PREFIX} GitHub Sync enabled - Setting up repository sync..."
 
 	git config --global user.name "${GITHUB_SYNC_USERNAME:-minecraft-server}"
@@ -206,7 +206,11 @@ EOF
 	
 	echo -e "${LOG_PREFIX} GitHub sync setup completed (pull-only mode)"
 else
-	echo -e "${LOG_PREFIX} GitHub sync disabled (GITHUB_SYNC_REPO not configured)"
+	if [[ "${GITHUB_SYNC_ENABLED:-0}" == "0" ]]; then
+		echo -e "${LOG_PREFIX} GitHub sync disabled (GITHUB_SYNC_ENABLED=0)"
+	else
+		echo -e "${LOG_PREFIX} GitHub sync disabled (GITHUB_SYNC_REPO or GITHUB_SYNC_TOKEN not configured)"
+	fi
 fi
 
 # Auto-install Hibernate plugin (only if enabled)
