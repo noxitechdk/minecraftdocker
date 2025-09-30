@@ -280,18 +280,15 @@ else
 		echo -e "${LOG_PREFIX} Backing up conflicting files to $backup_dir..."
 		for file in $conflicting_files; do
 			if [[ -f "$file" ]]; then
-				# Create directory structure in backup
 				backup_file_dir="$backup_dir/$(dirname "$file")"
 				mkdir -p "$backup_file_dir" 2>/dev/null || true
 				cp "$file" "$backup_dir/$file" 2>/dev/null || true
 				echo -e "${LOG_PREFIX} Backed up: $file"
 			fi
 		done
-		
-		# Add backup directory to gitignore
+
 		echo "$backup_dir/" >> .gitignore
-		
-		# Force reset to match remote
+
 		echo -e "${LOG_PREFIX} Resetting to match remote repository..."
 		if git fetch origin main && git reset --hard origin/main 2>/dev/null; then
 			echo -e "${LOG_PREFIX} Successfully synced with remote repository"
@@ -311,6 +308,93 @@ SYNC_SCRIPT
 		chmod +x github-sync.sh
 		echo -e "${LOG_PREFIX} Manual sync script created: ./github-sync.sh"
 		echo -e "${LOG_PREFIX} Use './github-sync.sh' to manually sync from GitHub while server is running"
+
+		cat > github-push.sh << 'PUSH_SCRIPT'
+#!/bin/bash
+
+# Usage: ./github-push.sh [commit_message]
+
+LOG_PREFIX="\033[1m\033[35mgithub-push~\033[0m"
+
+echo -e "${LOG_PREFIX} Starting manual GitHub push..."
+
+log_github_error() {
+	local operation="$1"
+	local error_output="$2"
+	echo -e "${LOG_PREFIX} GitHub Push Error [$operation]: $error_output" | tee -a github-sync-errors.log
+}
+
+if [[ -z "${GITHUB_SYNC_REPO}" || -z "${GITHUB_SYNC_TOKEN}" ]]; then
+	echo -e "${LOG_PREFIX} Error: GitHub sync not configured. Please set GITHUB_SYNC_REPO and GITHUB_SYNC_TOKEN."
+	exit 1
+fi
+
+if [[ ! -d ".git" ]]; then
+	echo -e "${LOG_PREFIX} Error: Git repository not initialized. Restart server to initialize GitHub sync."
+	exit 1
+fi
+
+COMMIT_MESSAGE="${1:-Manual push: $(date '+%Y-%m-%d %H:%M:%S UTC')}"
+
+echo -e "${LOG_PREFIX} Adding files to git..."
+
+git add plugins/ *.properties *.yml *.yaml *.toml config/ world/ world_nether/ world_the_end/ 2>/dev/null || true
+
+if git diff --cached --quiet 2>/dev/null; then
+	echo -e "${LOG_PREFIX} No changes to push - repository is up to date"
+	exit 0
+fi
+
+echo -e "${LOG_PREFIX} Files to be committed:"
+git diff --cached --name-only | while read file; do
+	echo -e "${LOG_PREFIX}   + $file"
+done
+
+echo -e "${LOG_PREFIX} Committing changes with message: '$COMMIT_MESSAGE'"
+
+commit_output=$(git commit -m "$COMMIT_MESSAGE" 2>&1)
+commit_result=$?
+
+if [[ $commit_result -eq 0 ]]; then
+	echo -e "${LOG_PREFIX} Successfully committed changes"
+
+	echo -e "${LOG_PREFIX} Pushing to remote repository..."
+	push_output=$(git push origin main 2>&1)
+	push_result=$?
+
+	if [[ $push_result -eq 0 ]]; then
+		echo -e "${LOG_PREFIX} Successfully pushed changes to GitHub repository"
+		echo -e "${LOG_PREFIX} Your server configs and plugins are now synced to GitHub"
+	else
+		if echo "$push_output" | grep -q "Permission denied\|Authentication failed"; then
+			log_github_error "PUSH" "Authentication failed during push. Token may be expired or invalid."
+			echo -e "${LOG_PREFIX} Check your GitHub token permissions and expiration"
+		elif echo "$push_output" | grep -q "Could not resolve host"; then
+			log_github_error "PUSH" "Network error during push: Cannot reach GitHub."
+		elif echo "$push_output" | grep -q "rejected"; then
+			log_github_error "PUSH" "Push rejected - remote has newer commits."
+			echo -e "${LOG_PREFIX} Try running './github-sync.sh' first to pull latest changes"
+		elif echo "$push_output" | grep -q "repository not found"; then
+			log_github_error "PUSH" "Repository not found. Check repository name and permissions."
+		else
+			log_github_error "PUSH" "Push failed with error: $push_output"
+		fi
+
+		echo -e "${LOG_PREFIX} Push failed - changes are committed locally but not uploaded to GitHub"
+		exit 1
+	fi
+else
+	log_github_error "COMMIT" "Commit failed with error: $commit_output"
+	echo -e "${LOG_PREFIX} Failed to commit changes"
+	exit 1
+fi
+
+echo -e "${LOG_PREFIX} Manual push completed successfully"
+PUSH_SCRIPT
+
+		chmod +x github-push.sh
+		echo -e "${LOG_PREFIX} Manual push script created: ./github-push.sh"
+		echo -e "${LOG_PREFIX} Use './github-push.sh [message]' to manually push changes to GitHub"
 	fi
 else
 	if [[ "${GITHUB_SYNC_ENABLED:-0}" == "0" ]]; then
