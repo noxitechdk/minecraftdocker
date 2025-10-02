@@ -470,17 +470,54 @@ if [[ "$OVERRIDE_STARTUP" == "1" ]]; then
 	# Display the command we're running in the output, and then execute it with the env
 	# from the container itself.
 	printf "${LOG_PREFIX} %s\n" "$PARSED"
-	# shellcheck disable=SC2086
-	exec env ${PARSED}
+	
+	# Start server med pipes for at kunne sende kommandoer
+	tail -f /dev/null | env ${PARSED} &
+	SERVER_PID=$!
+	
+	# Graceful shutdown handler
+	shutdown_server() {
+		echo -e "${LOG_PREFIX} Stopping server gracefully..."
+		kill -SIGTERM $SERVER_PID 2>/dev/null || true
+		
+		# Vent op til 30 sekunder på at serveren lukker ned
+		for i in {1..30}; do
+			if ! kill -0 $SERVER_PID 2>/dev/null; then
+				echo -e "${LOG_PREFIX} Server stopped successfully"
+				exit 0
+			fi
+			sleep 1
+		done
+		
+		# Hvis serveren ikke er stoppet, force kill
+		echo -e "${LOG_PREFIX} Server didn't stop in time, forcing shutdown..."
+		kill -9 $SERVER_PID 2>/dev/null || true
+		exit 1
+	}
+	
+	trap shutdown_server SIGTERM SIGINT
+	wait $SERVER_PID
 else
-	# Convert all of the "{{VARIABLE}}" parts of the command into the expected shell
-	# variable format of "${VARIABLE}" before evaluating the string and automatically
-	# replacing the values.
+	# Samme tilgang for else blokken
 	PARSED=$(echo "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g' | eval echo "$(cat -)")
-
-	# Display the command we're running in the output, and then execute it with the env
-	# from the container itself.
 	printf "${LOG_PREFIX} %s\n" "$PARSED"
-	# shellcheck disable=SC2086
-	exec env ${PARSED}
+	
+	tail -f /dev/null | env ${PARSED} &
+	SERVER_PID=$!
+	
+	shutdown_server() {
+		echo -e "${LOG_PREFIX} Stopping server gracefully..."
+		kill -SIGTERM $SERVER_PID 2>/dev/null || true
+		for i in {1..30}; do
+			if ! kill -0 $SERVER_PID 2>/dev/null; then
+				exit 0
+			fi
+			sleep 1
+		done
+		kill -9 $SERVER_PID 2>/dev/null || true
+		exit 1
+	}
+	
+	trap shutdown_server SIGTERM SIGINT
+	wait $SERVER_PID
 fi
