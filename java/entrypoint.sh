@@ -470,8 +470,46 @@ if [[ "$OVERRIDE_STARTUP" == "1" ]]; then
 	# Display the command we're running in the output, and then execute it with the env
 	# from the container itself.
 	printf "${LOG_PREFIX} %s\n" "$PARSED"
-	# shellcheck disable=SC2086
-	exec env ${PARSED}
+	
+	# Graceful shutdown handler
+	shutdown_handler() {
+		echo -e "${LOG_PREFIX} Received shutdown signal, sending 'stop' command to server..."
+		if [[ -p /tmp/minecraft_input ]]; then
+			echo "stop" > /tmp/minecraft_input
+		else
+			# Fallback: send SIGTERM to Java process
+			kill -TERM $JAVA_PID 2>/dev/null
+		fi
+		
+		# Wait for server to shut down gracefully
+		local wait_time=0
+		while kill -0 $JAVA_PID 2>/dev/null && [[ $wait_time -lt 30 ]]; do
+			sleep 1
+			((wait_time++))
+		done
+		
+		if kill -0 $JAVA_PID 2>/dev/null; then
+			echo -e "${LOG_PREFIX} Server didn't shut down gracefully, forcing termination..."
+			kill -KILL $JAVA_PID 2>/dev/null
+		else
+			echo -e "${LOG_PREFIX} Server shut down gracefully"
+		fi
+		
+		exit 0
+	}
+	
+	# Set up signal handlers
+	trap shutdown_handler SIGTERM SIGINT
+	
+	# Create named pipe for sending commands to server
+	mkfifo /tmp/minecraft_input 2>/dev/null || true
+	
+	# Start server in background with input pipe
+	tail -f /tmp/minecraft_input | env ${PARSED} &
+	JAVA_PID=$!
+	
+	# Wait for server process to finish
+	wait $JAVA_PID
 else
 	# Convert all of the "{{VARIABLE}}" parts of the command into the expected shell
 	# variable format of "${VARIABLE}" before evaluating the string and automatically
@@ -481,6 +519,35 @@ else
 	# Display the command we're running in the output, and then execute it with the env
 	# from the container itself.
 	printf "${LOG_PREFIX} %s\n" "$PARSED"
-	# shellcheck disable=SC2086
-	exec env ${PARSED}
+	
+	# Graceful shutdown handler for custom startup
+	shutdown_handler() {
+		echo -e "${LOG_PREFIX} Received shutdown signal, sending 'stop' command to server..."
+		if [[ -p /tmp/minecraft_input ]]; then
+			echo "stop" > /tmp/minecraft_input
+		else
+			kill -TERM $JAVA_PID 2>/dev/null
+		fi
+		
+		local wait_time=0
+		while kill -0 $JAVA_PID 2>/dev/null && [[ $wait_time -lt 30 ]]; do
+			sleep 1
+			((wait_time++))
+		done
+		
+		if kill -0 $JAVA_PID 2>/dev/null; then
+			echo -e "${LOG_PREFIX} Server didn't shut down gracefully, forcing termination..."
+			kill -KILL $JAVA_PID 2>/dev/null
+		else
+			echo -e "${LOG_PREFIX} Server shut down gracefully"
+		fi
+		
+		exit 0
+	}
+	
+	trap shutdown_handler SIGTERM SIGINT
+	mkfifo /tmp/minecraft_input 2>/dev/null || true
+	tail -f /tmp/minecraft_input | env ${PARSED} &
+	JAVA_PID=$!
+	wait $JAVA_PID
 fi
