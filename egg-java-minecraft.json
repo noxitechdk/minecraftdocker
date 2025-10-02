@@ -32,7 +32,7 @@
         "files": "{}",
         "startup": "{\r\n    \"done\": [\r\n        \")! For help, type \",\r\n        \"Listening on \/\",\r\n        \"Server started on\",\r\n        \"Limbo server listening on\"\r\n    ]\r\n}",
         "logs": "{}",
-        "stop": "^C"
+        "stop": "stop"
     },
     "scripts": {
         "installation": {

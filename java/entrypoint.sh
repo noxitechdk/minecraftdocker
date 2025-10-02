@@ -409,16 +409,13 @@ if [ -f "velocity.toml" ]; then
 	fi
 fi
 
-# config.yml
 if [ -f "config.yml" ]; then
-	# set query_port to SERVER_PORT
 	if grep -q "query_port" config.yml; then
 		sed -i "s/query_port: .*/query_port: ${SERVER_PORT}/" config.yml
 	else
 		echo "query_port: ${SERVER_PORT}" >> config.yml
 	fi
 
-	# set host to 0.0.0.0:SERVER_PORT
 	if grep -q "host" config.yml; then
 		sed -i "s/host: .*/host: 0.0.0.0:${SERVER_PORT}/" config.yml
 	else
@@ -428,8 +425,7 @@ fi
 	
 if [[ "$OVERRIDE_STARTUP" == "1" ]]; then
 	FLAGS=("-Dterminal.jline=false -Dterminal.ansi=true")
-	
-	# SIMD Operations are only for Java 16 - 21
+
 	if [[ "$SIMD_OPERATIONS" == "1" ]]; then
 		if [[ "$JAVA_MAJOR_VERSION" -ge 16 ]] && [[ "$JAVA_MAJOR_VERSION" -le 21 ]]; then
 			FLAGS+=("--add-modules=jdk.incubator.vector")
@@ -468,11 +464,9 @@ if [[ "$OVERRIDE_STARTUP" == "1" ]]; then
 	PARSED="java ${FLAGS[*]} -Xms256M -Xmx${SERVER_MEMORY_REAL}M -jar ${SERVER_JARFILE}"
 
 	printf "${LOG_PREFIX} %s\n" "$PARSED"
-	
-	# Create named pipe for sending commands
+
 	mkfifo /tmp/minecraft_input 2>/dev/null || true
-	
-	# Shutdown handler that sends stop command
+
 	shutdown_server() {
 		echo -e "${LOG_PREFIX} Sending stop command to server..."
 		echo "stop" > /tmp/minecraft_input
@@ -482,18 +476,17 @@ if [[ "$OVERRIDE_STARTUP" == "1" ]]; then
 	}
 	
 	trap shutdown_server SIGTERM SIGINT
-	
-	# Start server with input pipe
+
 	cat /tmp/minecraft_input | env ${PARSED} &
 	wait
-	
+
 	rm -f /tmp/minecraft_input
 else
 	PARSED=$(echo "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g' | eval echo "$(cat -)")
 	printf "${LOG_PREFIX} %s\n" "$PARSED"
-	
+
 	mkfifo /tmp/minecraft_input 2>/dev/null || true
-	
+
 	shutdown_server() {
 		echo -e "${LOG_PREFIX} Sending stop command to server..."
 		echo "stop" > /tmp/minecraft_input
@@ -501,11 +494,11 @@ else
 		echo "stop" > /tmp/minecraft_input
 		wait
 	}
-	
+
 	trap shutdown_server SIGTERM SIGINT
-	
+
 	cat /tmp/minecraft_input | env ${PARSED} &
 	wait
-	
+
 	rm -f /tmp/minecraft_input
 fi
