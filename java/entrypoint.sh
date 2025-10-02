@@ -470,21 +470,8 @@ if [[ "$OVERRIDE_STARTUP" == "1" ]]; then
 	# Display the command we're running in the output, and then execute it with the env
 	# from the container itself.
 	printf "${LOG_PREFIX} %s\n" "$PARSED"
-	
-	# Graceful shutdown function
-	shutdown_server() {
-		echo -e "${LOG_PREFIX} Received shutdown signal, stopping server gracefully..."
-		echo "stop"
-		wait
-		exit
-	}
-	
-	# Setup signal traps for graceful shutdown
-	trap shutdown_server SIGTERM SIGINT
-	
-	# Start server in background and wait
-	env ${PARSED} &
-	wait
+	# shellcheck disable=SC2086
+	exec env ${PARSED}
 else
 	# Convert all of the "{{VARIABLE}}" parts of the command into the expected shell
 	# variable format of "${VARIABLE}" before evaluating the string and automatically
@@ -494,17 +481,6 @@ else
 	# Display the command we're running in the output, and then execute it with the env
 	# from the container itself.
 	printf "${LOG_PREFIX} %s\n" "$PARSED"
-	
-	# Graceful shutdown function for custom startup
-	shutdown_server() {
-		echo -e "${LOG_PREFIX} Received shutdown signal, stopping server gracefully..."
-		echo "stop"
-		wait
-		exit
-	}
-	
-	trap shutdown_server SIGTERM SIGINT
-	env ${PARSED} &
-	wait
+	# shellcheck disable=SC2086
+	exec env ${PARSED}
 fi
-
