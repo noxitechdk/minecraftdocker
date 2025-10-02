@@ -471,47 +471,65 @@ if [[ "$OVERRIDE_STARTUP" == "1" ]]; then
 	# from the container itself.
 	printf "${LOG_PREFIX} %s\n" "$PARSED"
 	
-	# Create a wrapper to handle graceful shutdown
-	{
-		# Set up signal handler for graceful shutdown
-		handle_shutdown() {
-			echo -e "${LOG_PREFIX} Received shutdown signal, attempting graceful shutdown..."
-			if [[ -n "$MINECRAFT_PID" ]] && kill -0 "$MINECRAFT_PID" 2>/dev/null; then
-				echo -e "${LOG_PREFIX} Sending stop command to Minecraft server..."
-				echo "stop" 
-				
-				# Wait for graceful shutdown
-				local wait_time=0
-				while kill -0 "$MINECRAFT_PID" 2>/dev/null && [[ $wait_time -lt 30 ]]; do
-					sleep 1
-					((wait_time++))
-				done
-				
-				if kill -0 "$MINECRAFT_PID" 2>/dev/null; then
-					echo -e "${LOG_PREFIX} Force killing server after 30 seconds..."
-					kill -KILL "$MINECRAFT_PID" 2>/dev/null
-				else
-					echo -e "${LOG_PREFIX} Server shut down gracefully"
-				fi
-			fi
-			exit 0
-		}
-		
-		trap handle_shutdown SIGTERM SIGINT
-		
-		# Start the Minecraft server and capture its PID
-		env ${PARSED} &
-		MINECRAFT_PID=$!
-		
-		echo -e "${LOG_PREFIX} Minecraft server started with PID $MINECRAFT_PID"
-		
-		# Wait for the server to finish
-		wait $MINECRAFT_PID
-		exit_code=$?
-		
-		echo -e "${LOG_PREFIX} Minecraft server exited with code $exit_code"
-		exit $exit_code
+if [[ "$OVERRIDE_STARTUP" == "1" ]]; then
+	FLAGS=("-Dterminal.jline=false -Dterminal.ansi=true")
+
+	# SIMD Operations are only for Java 16 - 21
+	if [[ "$SIMD_OPERATIONS" == "1" ]]; then
+		if [[ "$JAVA_MAJOR_VERSION" -ge 16 ]] && [[ "$JAVA_MAJOR_VERSION" -le 21 ]]; then
+			FLAGS+=("--add-modules=jdk.incubator.vector")
+		else
+			echo -e "${LOG_PREFIX} SIMD Operations are only available for Java 16 - 21, skipping..."
+		fi
+	fi
+
+	if [[ "$REMOVE_UPDATE_WARNING" == "1" ]]; then
+		FLAGS+=("-DIReallyKnowWhatIAmDoingISwear")
+	fi
+
+	if [[ -n "$JAVA_AGENT" ]]; then
+		if [ -f "$JAVA_AGENT" ]; then
+			FLAGS+=("-javaagent:$JAVA_AGENT")
+		else
+			echo -e "${LOG_PREFIX} JAVA_AGENT file does not exist, skipping..."
+		fi
+	fi
+
+	if [[ "$ADDITIONAL_FLAGS" == "Aikar's Flags" ]]; then
+		FLAGS+=("-XX:+DisableExplicitGC -XX:+ParallelRefProcEnabled -XX:+PerfDisableSharedMem -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1HeapRegionSize=8M -XX:G1HeapWastePercent=5 -XX:G1MaxNewSizePercent=40 -XX:G1MixedGCCountTarget=4 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1NewSizePercent=30 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:G1ReservePercent=20 -XX:InitiatingHeapOccupancyPercent=15 -XX:MaxGCPauseMillis=200 -XX:MaxTenuringThreshold=1 -XX:SurvivorRatio=32 -Dusing.aikars.flags=https://mcflags.emc.gs -Daikars.new.flags=true")
+	elif [[ "$ADDITIONAL_FLAGS" == "Velocity Flags" ]]; then
+		FLAGS+=("-XX:+ParallelRefProcEnabled -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1HeapRegionSize=4M -XX:MaxInlineLevel=15")
+	fi
+
+	if [[ "$MINEHUT_SUPPORT" == "Velocity" ]]; then
+		FLAGS+=("-Dmojang.sessionserver=https://api.minehut.com/mitm/proxy/session/minecraft/hasJoined")
+	elif [[ "$MINEHUT_SUPPORT" == "Waterfall" ]]; then
+		FLAGS+=("-Dwaterfall.auth.url=\"https://api.minehut.com/mitm/proxy/session/minecraft/hasJoined?username=%s&serverId=%s%s\")")
+	elif [[ "$MINEHUT_SUPPORT" = "Bukkit" ]]; then
+		FLAGS+=("-Dminecraft.api.auth.host=https://authserver.mojang.com/ -Dminecraft.api.account.host=https://api.mojang.com/ -Dminecraft.api.services.host=https://api.minecraftservices.com/ -Dminecraft.api.session.host=https://api.minehut.com/mitm/proxy")
+	fi
+
+	SERVER_MEMORY_REAL=$(($SERVER_MEMORY*$MAXIMUM_RAM/100))
+	PARSED="java ${FLAGS[*]} -Xms256M -Xmx${SERVER_MEMORY_REAL}M -jar ${SERVER_JARFILE} nogui"
+
+	# Display the command we're running in the output, and then execute it with the env
+	# from the container itself.
+	printf "${LOG_PREFIX} %s\n" "$PARSED"
+	
+	# Graceful shutdown function
+	shutdown_server() {
+		echo -e "${LOG_PREFIX} Received shutdown signal, stopping server gracefully..."
+		echo "stop"
+		wait
+		exit
 	}
+	
+	# Setup signal traps for graceful shutdown
+	trap shutdown_server SIGTERM SIGINT
+	
+	# Start server in background and wait
+	env ${PARSED} &
+	wait
 else
 	# Convert all of the "{{VARIABLE}}" parts of the command into the expected shell
 	# variable format of "${VARIABLE}" before evaluating the string and automatically
@@ -522,40 +540,15 @@ else
 	# from the container itself.
 	printf "${LOG_PREFIX} %s\n" "$PARSED"
 	
-	# Create a wrapper to handle graceful shutdown for custom startup
-	{
-		handle_shutdown() {
-			echo -e "${LOG_PREFIX} Received shutdown signal, attempting graceful shutdown..."
-			if [[ -n "$MINECRAFT_PID" ]] && kill -0 "$MINECRAFT_PID" 2>/dev/null; then
-				echo -e "${LOG_PREFIX} Sending stop command to Minecraft server..."
-				echo "stop"
-				
-				local wait_time=0
-				while kill -0 "$MINECRAFT_PID" 2>/dev/null && [[ $wait_time -lt 30 ]]; do
-					sleep 1
-					((wait_time++))
-				done
-				
-				if kill -0 "$MINECRAFT_PID" 2>/dev/null; then
-					echo -e "${LOG_PREFIX} Force killing server after 30 seconds..."
-					kill -KILL "$MINECRAFT_PID" 2>/dev/null
-				else
-					echo -e "${LOG_PREFIX} Server shut down gracefully"
-				fi
-			fi
-			exit 0
-		}
-		
-		trap handle_shutdown SIGTERM SIGINT
-		
-		env ${PARSED} &
-		MINECRAFT_PID=$!
-		
-		echo -e "${LOG_PREFIX} Minecraft server started with PID $MINECRAFT_PID"
-		wait $MINECRAFT_PID
-		exit_code=$?
-		
-		echo -e "${LOG_PREFIX} Minecraft server exited with code $exit_code"
-		exit $exit_code
+	# Graceful shutdown function for custom startup
+	shutdown_server() {
+		echo -e "${LOG_PREFIX} Received shutdown signal, stopping server gracefully..."
+		echo "stop"
+		wait
+		exit
 	}
+	
+	trap shutdown_server SIGTERM SIGINT
+	env ${PARSED} &
+	wait
 fi
