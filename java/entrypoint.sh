@@ -425,51 +425,6 @@ if [ -f "config.yml" ]; then
 		echo "host: 0.0.0.0:${SERVER_PORT}" >> config.yml
 	fi
 fi
-
-if [[ "$OVERRIDE_STARTUP" == "1" ]]; then
-	FLAGS=("-Dterminal.jline=false -Dterminal.ansi=true")
-
-	# SIMD Operations are only for Java 16 - 21
-	if [[ "$SIMD_OPERATIONS" == "1" ]]; then
-		if [[ "$JAVA_MAJOR_VERSION" -ge 16 ]] && [[ "$JAVA_MAJOR_VERSION" -le 21 ]]; then
-			FLAGS+=("--add-modules=jdk.incubator.vector")
-		else
-			echo -e "${LOG_PREFIX} SIMD Operations are only available for Java 16 - 21, skipping..."
-		fi
-	fi
-
-	if [[ "$REMOVE_UPDATE_WARNING" == "1" ]]; then
-		FLAGS+=("-DIReallyKnowWhatIAmDoingISwear")
-	fi
-
-	if [[ -n "$JAVA_AGENT" ]]; then
-		if [ -f "$JAVA_AGENT" ]; then
-			FLAGS+=("-javaagent:$JAVA_AGENT")
-		else
-			echo -e "${LOG_PREFIX} JAVA_AGENT file does not exist, skipping..."
-		fi
-	fi
-
-	if [[ "$ADDITIONAL_FLAGS" == "Aikar's Flags" ]]; then
-		FLAGS+=("-XX:+DisableExplicitGC -XX:+ParallelRefProcEnabled -XX:+PerfDisableSharedMem -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1HeapRegionSize=8M -XX:G1HeapWastePercent=5 -XX:G1MaxNewSizePercent=40 -XX:G1MixedGCCountTarget=4 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1NewSizePercent=30 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:G1ReservePercent=20 -XX:InitiatingHeapOccupancyPercent=15 -XX:MaxGCPauseMillis=200 -XX:MaxTenuringThreshold=1 -XX:SurvivorRatio=32 -Dusing.aikars.flags=https://mcflags.emc.gs -Daikars.new.flags=true")
-	elif [[ "$ADDITIONAL_FLAGS" == "Velocity Flags" ]]; then
-		FLAGS+=("-XX:+ParallelRefProcEnabled -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1HeapRegionSize=4M -XX:MaxInlineLevel=15")
-	fi
-
-	if [[ "$MINEHUT_SUPPORT" == "Velocity" ]]; then
-		FLAGS+=("-Dmojang.sessionserver=https://api.minehut.com/mitm/proxy/session/minecraft/hasJoined")
-	elif [[ "$MINEHUT_SUPPORT" == "Waterfall" ]]; then
-		FLAGS+=("-Dwaterfall.auth.url=https://api.minehut.com/mitm/proxy/session/minecraft/hasJoined?username=%s&serverId=%s%s")
-	elif [[ "$MINEHUT_SUPPORT" = "Bukkit" ]]; then
-		FLAGS+=("-Dminecraft.api.auth.host=https://authserver.mojang.com/ -Dminecraft.api.account.host=https://api.mojang.com/ -Dminecraft.api.services.host=https://api.minecraftservices.com/ -Dminecraft.api.session.host=https://api.minehut.com/mitm/proxy")
-	fi
-
-	SERVER_MEMORY_REAL=$(($SERVER_MEMORY*$MAXIMUM_RAM/100))
-	PARSED="java ${FLAGS[*]} -Xms256M -Xmx${SERVER_MEMORY_REAL}M -jar ${SERVER_JARFILE} nogui"
-
-	# Display the command we're running in the output, and then execute it with the env
-	# from the container itself.
-	printf "${LOG_PREFIX} %s\n" "$PARSED"
 	
 if [[ "$OVERRIDE_STARTUP" == "1" ]]; then
 	FLAGS=("-Dterminal.jline=false -Dterminal.ansi=true")
