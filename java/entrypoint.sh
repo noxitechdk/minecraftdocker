@@ -53,7 +53,7 @@ if [[ "${GITHUB_SYNC_ENABLED:-0}" == "1" && -n "${GITHUB_SYNC_REPO}" && -n "${GI
 		local error_output="$2"
 		echo -e "${LOG_PREFIX} GitHub Sync Error [$operation]: $error_output" | tee -a github-sync-errors.log
 	}
-	
+
 	if [[ ! -d ".git" ]]; then
 		echo -e "${LOG_PREFIX} Initializing GitHub sync repository..."
 
@@ -153,7 +153,7 @@ EOF
 
 		pull_output=$(git pull origin main 2>&1)
 		pull_result=$?
-		
+
 		if [[ $pull_result -eq 0 ]]; then
 			echo -e "${LOG_PREFIX} Successfully pulled latest changes from repository"
 		else
@@ -178,7 +178,7 @@ EOF
 				mkdir -p "$backup_dir"
 
 				conflicting_files=$(echo "$pull_output" | grep -A 100 "would be overwritten by merge:" | grep -E "^\s+" | sed 's/^[[:space:]]*//' | grep -v "Please move or remove")
-				
+
 				echo -e "${LOG_PREFIX} Backing up conflicting files to $backup_dir..."
 				for file in $conflicting_files; do
 					if [[ -f "$file" ]]; then
@@ -203,7 +203,7 @@ EOF
 			fi
 		fi
 	fi
-	
+
 	echo -e "${LOG_PREFIX} GitHub sync setup completed (pull-only mode)"
 else
 	if [[ "${GITHUB_SYNC_ENABLED:-0}" == "0" ]]; then
