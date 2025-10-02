@@ -428,7 +428,7 @@ fi
 	
 if [[ "$OVERRIDE_STARTUP" == "1" ]]; then
 	FLAGS=("-Dterminal.jline=false -Dterminal.ansi=true")
-
+	
 	# SIMD Operations are only for Java 16 - 21
 	if [[ "$SIMD_OPERATIONS" == "1" ]]; then
 		if [[ "$JAVA_MAJOR_VERSION" -ge 16 ]] && [[ "$JAVA_MAJOR_VERSION" -le 21 ]]; then
@@ -465,59 +465,47 @@ if [[ "$OVERRIDE_STARTUP" == "1" ]]; then
 	fi
 
 	SERVER_MEMORY_REAL=$(($SERVER_MEMORY*$MAXIMUM_RAM/100))
-	PARSED="java ${FLAGS[*]} -Xms256M -Xmx${SERVER_MEMORY_REAL}M -jar ${SERVER_JARFILE} nogui"
+	PARSED="java ${FLAGS[*]} -Xms256M -Xmx${SERVER_MEMORY_REAL}M -jar ${SERVER_JARFILE}"
 
-	# Display the command we're running in the output, and then execute it with the env
-	# from the container itself.
 	printf "${LOG_PREFIX} %s\n" "$PARSED"
 	
-	# Start server med pipes for at kunne sende kommandoer
-	tail -f /dev/null | env ${PARSED} &
-	SERVER_PID=$!
+	# Create named pipe for sending commands
+	mkfifo /tmp/minecraft_input 2>/dev/null || true
 	
-	# Graceful shutdown handler
+	# Shutdown handler that sends stop command
 	shutdown_server() {
-		echo -e "${LOG_PREFIX} Stopping server gracefully..."
-		kill -SIGTERM $SERVER_PID 2>/dev/null || true
-		
-		# Vent op til 30 sekunder på at serveren lukker ned
-		for i in {1..30}; do
-			if ! kill -0 $SERVER_PID 2>/dev/null; then
-				echo -e "${LOG_PREFIX} Server stopped successfully"
-				exit 0
-			fi
-			sleep 1
-		done
-		
-		# Hvis serveren ikke er stoppet, force kill
-		echo -e "${LOG_PREFIX} Server didn't stop in time, forcing shutdown..."
-		kill -9 $SERVER_PID 2>/dev/null || true
-		exit 1
+		echo -e "${LOG_PREFIX} Sending stop command to server..."
+		echo "stop" > /tmp/minecraft_input
+		sleep 2
+		echo "stop" > /tmp/minecraft_input
+		wait
 	}
 	
 	trap shutdown_server SIGTERM SIGINT
-	wait $SERVER_PID
+	
+	# Start server with input pipe
+	cat /tmp/minecraft_input | env ${PARSED} &
+	wait
+	
+	rm -f /tmp/minecraft_input
 else
-	# Samme tilgang for else blokken
 	PARSED=$(echo "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g' | eval echo "$(cat -)")
 	printf "${LOG_PREFIX} %s\n" "$PARSED"
 	
-	tail -f /dev/null | env ${PARSED} &
-	SERVER_PID=$!
+	mkfifo /tmp/minecraft_input 2>/dev/null || true
 	
 	shutdown_server() {
-		echo -e "${LOG_PREFIX} Stopping server gracefully..."
-		kill -SIGTERM $SERVER_PID 2>/dev/null || true
-		for i in {1..30}; do
-			if ! kill -0 $SERVER_PID 2>/dev/null; then
-				exit 0
-			fi
-			sleep 1
-		done
-		kill -9 $SERVER_PID 2>/dev/null || true
-		exit 1
+		echo -e "${LOG_PREFIX} Sending stop command to server..."
+		echo "stop" > /tmp/minecraft_input
+		sleep 2
+		echo "stop" > /tmp/minecraft_input
+		wait
 	}
 	
 	trap shutdown_server SIGTERM SIGINT
-	wait $SERVER_PID
+	
+	cat /tmp/minecraft_input | env ${PARSED} &
+	wait
+	
+	rm -f /tmp/minecraft_input
 fi
