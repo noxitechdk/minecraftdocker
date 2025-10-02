@@ -426,6 +426,7 @@ fi
 if [[ "$OVERRIDE_STARTUP" == "1" ]]; then
 	FLAGS=("-Dterminal.jline=false -Dterminal.ansi=true")
 
+	# SIMD Operations are only for Java 16 - 21
 	if [[ "$SIMD_OPERATIONS" == "1" ]]; then
 		if [[ "$JAVA_MAJOR_VERSION" -ge 16 ]] && [[ "$JAVA_MAJOR_VERSION" -le 21 ]]; then
 			FLAGS+=("--add-modules=jdk.incubator.vector")
@@ -461,44 +462,22 @@ if [[ "$OVERRIDE_STARTUP" == "1" ]]; then
 	fi
 
 	SERVER_MEMORY_REAL=$(($SERVER_MEMORY*$MAXIMUM_RAM/100))
-	PARSED="java ${FLAGS[*]} -Xms256M -Xmx${SERVER_MEMORY_REAL}M -jar ${SERVER_JARFILE}"
+	PARSED="java ${FLAGS[*]} -Xms256M -Xmx${SERVER_MEMORY_REAL}M -jar ${SERVER_JARFILE} nogui"
 
+	# Display the command we're running in the output, and then execute it with the env
+	# from the container itself.
 	printf "${LOG_PREFIX} %s\n" "$PARSED"
-
-	mkfifo /tmp/minecraft_input 2>/dev/null || true
-
-	shutdown_server() {
-		echo -e "${LOG_PREFIX} Sending stop command to server..."
-		echo "stop" > /tmp/minecraft_input
-		sleep 2
-		echo "stop" > /tmp/minecraft_input
-		wait
-	}
-	
-	trap shutdown_server SIGTERM SIGINT
-
-	cat /tmp/minecraft_input | env ${PARSED} &
-	wait
-
-	rm -f /tmp/minecraft_input
+	# shellcheck disable=SC2086
+	exec env ${PARSED}
 else
+	# Convert all of the "{{VARIABLE}}" parts of the command into the expected shell
+	# variable format of "${VARIABLE}" before evaluating the string and automatically
+	# replacing the values.
 	PARSED=$(echo "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g' | eval echo "$(cat -)")
+
+	# Display the command we're running in the output, and then execute it with the env
+	# from the container itself.
 	printf "${LOG_PREFIX} %s\n" "$PARSED"
-
-	mkfifo /tmp/minecraft_input 2>/dev/null || true
-
-	shutdown_server() {
-		echo -e "${LOG_PREFIX} Sending stop command to server..."
-		echo "stop" > /tmp/minecraft_input
-		sleep 2
-		echo "stop" > /tmp/minecraft_input
-		wait
-	}
-
-	trap shutdown_server SIGTERM SIGINT
-
-	cat /tmp/minecraft_input | env ${PARSED} &
-	wait
-
-	rm -f /tmp/minecraft_input
+	# shellcheck disable=SC2086
+	exec env ${PARSED}
 fi
