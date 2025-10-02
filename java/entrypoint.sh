@@ -471,45 +471,47 @@ if [[ "$OVERRIDE_STARTUP" == "1" ]]; then
 	# from the container itself.
 	printf "${LOG_PREFIX} %s\n" "$PARSED"
 	
-	# Graceful shutdown handler
-	shutdown_handler() {
-		echo -e "${LOG_PREFIX} Received shutdown signal, sending 'stop' command to server..."
-		if [[ -p /tmp/minecraft_input ]]; then
-			echo "stop" > /tmp/minecraft_input
-		else
-			# Fallback: send SIGTERM to Java process
-			kill -TERM $JAVA_PID 2>/dev/null
-		fi
+	# Create a wrapper to handle graceful shutdown
+	{
+		# Set up signal handler for graceful shutdown
+		handle_shutdown() {
+			echo -e "${LOG_PREFIX} Received shutdown signal, attempting graceful shutdown..."
+			if [[ -n "$MINECRAFT_PID" ]] && kill -0 "$MINECRAFT_PID" 2>/dev/null; then
+				echo -e "${LOG_PREFIX} Sending stop command to Minecraft server..."
+				echo "stop" 
+				
+				# Wait for graceful shutdown
+				local wait_time=0
+				while kill -0 "$MINECRAFT_PID" 2>/dev/null && [[ $wait_time -lt 30 ]]; do
+					sleep 1
+					((wait_time++))
+				done
+				
+				if kill -0 "$MINECRAFT_PID" 2>/dev/null; then
+					echo -e "${LOG_PREFIX} Force killing server after 30 seconds..."
+					kill -KILL "$MINECRAFT_PID" 2>/dev/null
+				else
+					echo -e "${LOG_PREFIX} Server shut down gracefully"
+				fi
+			fi
+			exit 0
+		}
 		
-		# Wait for server to shut down gracefully
-		local wait_time=0
-		while kill -0 $JAVA_PID 2>/dev/null && [[ $wait_time -lt 30 ]]; do
-			sleep 1
-			((wait_time++))
-		done
+		trap handle_shutdown SIGTERM SIGINT
 		
-		if kill -0 $JAVA_PID 2>/dev/null; then
-			echo -e "${LOG_PREFIX} Server didn't shut down gracefully, forcing termination..."
-			kill -KILL $JAVA_PID 2>/dev/null
-		else
-			echo -e "${LOG_PREFIX} Server shut down gracefully"
-		fi
+		# Start the Minecraft server and capture its PID
+		env ${PARSED} &
+		MINECRAFT_PID=$!
 		
-		exit 0
+		echo -e "${LOG_PREFIX} Minecraft server started with PID $MINECRAFT_PID"
+		
+		# Wait for the server to finish
+		wait $MINECRAFT_PID
+		exit_code=$?
+		
+		echo -e "${LOG_PREFIX} Minecraft server exited with code $exit_code"
+		exit $exit_code
 	}
-	
-	# Set up signal handlers
-	trap shutdown_handler SIGTERM SIGINT
-	
-	# Create named pipe for sending commands to server
-	mkfifo /tmp/minecraft_input 2>/dev/null || true
-	
-	# Start server in background with input pipe
-	tail -f /tmp/minecraft_input | env ${PARSED} &
-	JAVA_PID=$!
-	
-	# Wait for server process to finish
-	wait $JAVA_PID
 else
 	# Convert all of the "{{VARIABLE}}" parts of the command into the expected shell
 	# variable format of "${VARIABLE}" before evaluating the string and automatically
@@ -520,34 +522,40 @@ else
 	# from the container itself.
 	printf "${LOG_PREFIX} %s\n" "$PARSED"
 	
-	# Graceful shutdown handler for custom startup
-	shutdown_handler() {
-		echo -e "${LOG_PREFIX} Received shutdown signal, sending 'stop' command to server..."
-		if [[ -p /tmp/minecraft_input ]]; then
-			echo "stop" > /tmp/minecraft_input
-		else
-			kill -TERM $JAVA_PID 2>/dev/null
-		fi
+	# Create a wrapper to handle graceful shutdown for custom startup
+	{
+		handle_shutdown() {
+			echo -e "${LOG_PREFIX} Received shutdown signal, attempting graceful shutdown..."
+			if [[ -n "$MINECRAFT_PID" ]] && kill -0 "$MINECRAFT_PID" 2>/dev/null; then
+				echo -e "${LOG_PREFIX} Sending stop command to Minecraft server..."
+				echo "stop"
+				
+				local wait_time=0
+				while kill -0 "$MINECRAFT_PID" 2>/dev/null && [[ $wait_time -lt 30 ]]; do
+					sleep 1
+					((wait_time++))
+				done
+				
+				if kill -0 "$MINECRAFT_PID" 2>/dev/null; then
+					echo -e "${LOG_PREFIX} Force killing server after 30 seconds..."
+					kill -KILL "$MINECRAFT_PID" 2>/dev/null
+				else
+					echo -e "${LOG_PREFIX} Server shut down gracefully"
+				fi
+			fi
+			exit 0
+		}
 		
-		local wait_time=0
-		while kill -0 $JAVA_PID 2>/dev/null && [[ $wait_time -lt 30 ]]; do
-			sleep 1
-			((wait_time++))
-		done
+		trap handle_shutdown SIGTERM SIGINT
 		
-		if kill -0 $JAVA_PID 2>/dev/null; then
-			echo -e "${LOG_PREFIX} Server didn't shut down gracefully, forcing termination..."
-			kill -KILL $JAVA_PID 2>/dev/null
-		else
-			echo -e "${LOG_PREFIX} Server shut down gracefully"
-		fi
+		env ${PARSED} &
+		MINECRAFT_PID=$!
 		
-		exit 0
+		echo -e "${LOG_PREFIX} Minecraft server started with PID $MINECRAFT_PID"
+		wait $MINECRAFT_PID
+		exit_code=$?
+		
+		echo -e "${LOG_PREFIX} Minecraft server exited with code $exit_code"
+		exit $exit_code
 	}
-	
-	trap shutdown_handler SIGTERM SIGINT
-	mkfifo /tmp/minecraft_input 2>/dev/null || true
-	tail -f /tmp/minecraft_input | env ${PARSED} &
-	JAVA_PID=$!
-	wait $JAVA_PID
 fi
