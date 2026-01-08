@@ -41,176 +41,45 @@ else
 	echo -e "${LOG_PREFIX} Skipping malware scan..."
 fi
 
-if [[ "${GITHUB_SYNC_ENABLED:-0}" == "1" && -n "${GITHUB_SYNC_REPO}" && -n "${GITHUB_SYNC_TOKEN}" ]]; then
-	echo -e "${LOG_PREFIX} GitHub Sync enabled - Setting up repository sync..."
+# Auto-install Empty Server plugin (only if enabled)
+if [[ "${EMPTY_SERVER_ENABLED:-0}" == "1" ]]; then
+	echo -e "${LOG_PREFIX} Installing Empty Server plugin..."
 
-	git config --global user.name "${GITHUB_SYNC_USERNAME:-minecraft-server}"
-	git config --global user.email "${GITHUB_SYNC_EMAIL:-server@minecraft.com}"
-	git config --global init.defaultBranch main
+	mkdir -p plugins
 
-	log_github_error() {
-		local operation="$1"
-		local error_output="$2"
-		echo -e "${LOG_PREFIX} GitHub Sync Error [$operation]: $error_output" | tee -a github-sync-errors.log
-	}
+	EMPTY_SERVER_INSTALLED=false
 
-	if [[ ! -d ".git" ]]; then
-		echo -e "${LOG_PREFIX} Initializing GitHub sync repository..."
-
-		clone_output=$(git clone "https://${GITHUB_SYNC_TOKEN}@github.com/${GITHUB_SYNC_REPO}.git" /tmp/sync-repo 2>&1)
-		clone_result=$?
-		
-		if [[ $clone_result -eq 0 ]]; then
-			echo -e "${LOG_PREFIX} Repository found, syncing existing data..."
-
-			if [[ -d "/tmp/sync-repo/plugins" ]]; then
-				mkdir -p plugins
-				if cp -r /tmp/sync-repo/plugins/* plugins/ 2>/dev/null; then
-					echo -e "${LOG_PREFIX} Synced plugins from repository"
-				else
-					echo -e "${LOG_PREFIX} Warning: Failed to copy some plugin files"
-				fi
-			fi
-
-			for config_file in server.properties spigot.yml bukkit.yml paper.yml config.yml settings.yml velocity.toml; do
-				if [[ -f "/tmp/sync-repo/$config_file" ]]; then
-					if cp "/tmp/sync-repo/$config_file" "./$config_file" 2>/dev/null; then
-						echo -e "${LOG_PREFIX} Synced $config_file from repository"
-					else
-						echo -e "${LOG_PREFIX} Warning: Failed to sync $config_file"
-					fi
-				fi
-			done
-
-			for config_dir in config world world_nether world_the_end; do
-				if [[ -d "/tmp/sync-repo/$config_dir" ]]; then
-					if cp -r "/tmp/sync-repo/$config_dir" "./" 2>/dev/null; then
-						echo -e "${LOG_PREFIX} Synced $config_dir from repository"
-					else
-						echo -e "${LOG_PREFIX} Warning: Failed to sync $config_dir directory"
-					fi
-				fi
-			done
-
-			git init
-			git remote add origin "https://${GITHUB_SYNC_TOKEN}@github.com/${GITHUB_SYNC_REPO}.git"
-
-			rm -rf /tmp/sync-repo
-		else
-			if echo "$clone_output" | grep -q "not found"; then
-				log_github_error "CLONE" "Repository '${GITHUB_SYNC_REPO}' not found. Please check repository name and permissions."
-			elif echo "$clone_output" | grep -q "Permission denied\|Authentication failed"; then
-				log_github_error "CLONE" "Authentication failed. Please check your GitHub token permissions."
-			elif echo "$clone_output" | grep -q "Could not resolve host"; then
-				log_github_error "CLONE" "Network error: Cannot reach GitHub. Check internet connection."
-			else
-				log_github_error "CLONE" "Unknown clone error: $clone_output"
-			fi
-
-			echo -e "${LOG_PREFIX} Repository clone failed, initializing empty repository for future sync..."
-			git init
-			git remote add origin "https://${GITHUB_SYNC_TOKEN}@github.com/${GITHUB_SYNC_REPO}.git"
-		fi
-
-		cat > .gitignore << 'EOF'
-# Server files to ignore
-*.log
-logs/
-cache/
-crash-reports/
-libraries/
-versions/
-banned-*.json
-ops.json
-whitelist.json
-usernamecache.json
-usercache.json
-session.lock
-*.pid
-temp/
-.console_history
-github-sync-errors.log
-backup-*/
-
-# Paper remapped files
-plugins/.paper-remapped/
-
-# Keep only plugins and configs
-!plugins/
-!*.properties
-!*.yml
-!*.yaml
-!*.toml
-!config/
-!world/
-!world_nether/
-!world_the_end/
-EOF
-
-		echo -e "${LOG_PREFIX} GitHub sync repository initialized"
-	else
-		echo -e "${LOG_PREFIX} Git repository already exists, pulling latest changes..."
-
-		pull_output=$(git pull origin main 2>&1)
-		pull_result=$?
-
-		if [[ $pull_result -eq 0 ]]; then
-			echo -e "${LOG_PREFIX} Successfully pulled latest changes from repository"
-		else
-			if echo "$pull_output" | grep -q "Permission denied\|Authentication failed"; then
-				log_github_error "PULL" "Authentication failed during pull. Token may be expired or invalid."
-			elif echo "$pull_output" | grep -q "Could not resolve host"; then
-				log_github_error "PULL" "Network error during pull: Cannot reach GitHub."
-			elif echo "$pull_output" | grep -q "refusing to merge unrelated histories"; then
-				log_github_error "PULL" "Repository history conflict. May need manual intervention."
-				echo -e "${LOG_PREFIX} Attempting to resolve with --allow-unrelated-histories..."
-				if git pull origin main --allow-unrelated-histories 2>/dev/null; then
-					echo -e "${LOG_PREFIX} Successfully resolved history conflict"
-				else
-					log_github_error "PULL" "Failed to resolve history conflict"
-				fi
-			elif echo "$pull_output" | grep -q "fatal: couldn't find remote ref"; then
-				log_github_error "PULL" "Main branch not found in repository. Repository may be empty."
-			elif echo "$pull_output" | grep -q "would be overwritten by merge"; then
-				echo -e "${LOG_PREFIX} Untracked files conflict detected. Backing up and resolving..."
-
-				backup_dir="backup-$(date '+%Y%m%d-%H%M%S')"
-				mkdir -p "$backup_dir"
-
-				conflicting_files=$(echo "$pull_output" | grep -A 100 "would be overwritten by merge:" | grep -E "^\s+" | sed 's/^[[:space:]]*//' | grep -v "Please move or remove")
-
-				echo -e "${LOG_PREFIX} Backing up conflicting files to $backup_dir..."
-				for file in $conflicting_files; do
-					if [[ -f "$file" ]]; then
-						backup_file_dir="$backup_dir/$(dirname "$file")"
-						mkdir -p "$backup_file_dir" 2>/dev/null || true
-						cp "$file" "$backup_dir/$file" 2>/dev/null || true
-						echo -e "${LOG_PREFIX} Backed up: $file"
-					fi
-				done
-
-				echo "$backup_dir/" >> .gitignore
-
-				echo -e "${LOG_PREFIX} Resetting to match remote repository..."
-				if git fetch origin main && git reset --hard origin/main 2>/dev/null; then
-					echo -e "${LOG_PREFIX} Successfully synced with remote repository"
-					echo -e "${LOG_PREFIX} Your local files have been backed up to: $backup_dir"
-				else
-					log_github_error "PULL" "Failed to force sync with remote repository"
-				fi
-			else
-				log_github_error "PULL" "Pull failed with error: $pull_output"
-			fi
-		fi
+	if [[ -f "/emptyserver.jar" ]]; then
+		echo -e "${LOG_PREFIX} Found static Empty Server plugin, installing..."
+		cp /emptyserver.jar plugins/emptyserver.jar
+		EMPTY_SERVER_INSTALLED=true
 	fi
 
-	echo -e "${LOG_PREFIX} GitHub sync setup completed (pull-only mode)"
+	echo -e "${LOG_PREFIX} Checking for latest Empty Server version from GitHub..."
+
+	LATEST_URL=$(curl -s "https://api.github.com/repos/Stadric/emptyServer/releases/latest" | grep "browser_download_url.*\.jar" | head -n 1 | cut -d '"' -f 4)
+
+	if [[ -n "$LATEST_URL" ]]; then
+		echo -e "${LOG_PREFIX} Downloading latest Empty Server plugin from: $LATEST_URL"
+
+		if curl -sL "$LATEST_URL" -o /tmp/emptyserver-latest.jar; then
+			mv /tmp/emptyserver-latest.jar plugins/emptyserver.jar
+			echo -e "${LOG_PREFIX} Latest Empty Server plugin installed successfully"
+			EMPTY_SERVER_INSTALLED=true
+		else
+			echo -e "${LOG_PREFIX} Failed to download latest version, using static version if available"
+		fi
+	else
+		echo -e "${LOG_PREFIX} Could not fetch latest release info, using static version if available"
+	fi
+
+	if [[ "$EMPTY_SERVER_INSTALLED" == "true" ]]; then
+		echo -e "${LOG_PREFIX} Empty Server plugin installation completed"
+	else
+		echo -e "${LOG_PREFIX} No Empty Server plugin found to install"
+	fi
 else
-	if [[ "${GITHUB_SYNC_ENABLED:-0}" == "0" ]]; then
-		echo -e "${LOG_PREFIX} GitHub sync disabled (GITHUB_SYNC_ENABLED=0)"
-	else
-		echo -e "${LOG_PREFIX} GitHub sync disabled (GITHUB_SYNC_REPO or GITHUB_SYNC_TOKEN not configured)"
-	fi
+	echo -e "${LOG_PREFIX} Empty Server plugin installation disabled (EMPTY_SERVER_ENABLED=0)"
 fi
 
 # Auto-install Hibernate plugin (only if enabled)
