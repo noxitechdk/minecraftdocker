@@ -23,8 +23,7 @@
         "Java 17": "ghcr.io\/noxitechdk\/minecraftdocker:java17",
         "Java 16": "ghcr.io\/noxitechdk\/minecraftdocker:java16",
         "Java 11": "ghcr.io\/noxitechdk\/minecraftdocker:java11",
-        "Java 8": "ghcr.io\/noxitechdk\/minecraftdocker:java8",
-        "Java 7": "ghcr.io\/noxitechdk\/minecraftdocker:java7"
+        "Java 8": "ghcr.io\/noxitechdk\/minecraftdocker:java8"
     },
     "file_denylist": [],
     "startup": "java -Dterminal.jline=false -Dterminal.ansi=true -Xms256M -Xmx$(({{SERVER_MEMORY}}*{{MAXIMUM_RAM}}\/100))M -jar {{SERVER_JARFILE}} nogui",
@@ -146,16 +145,6 @@
             "name": "Malware Scan",
             "description": "Toggle running a Malware Scan on Server Startup using https:\/\/github.com\/OpticFusion1\/MCAntiMalware.",
             "env_variable": "MALWARE_SCAN",
-            "default_value": "0",
-            "user_viewable": true,
-            "user_editable": true,
-            "rules": "required|boolean",
-            "field_type": "text"
-        },
-        {
-            "name": "Empty Server",
-            "description": "Enable Empty Server plugin to automatically stop the server after 5 minutes of inactivity (no players online).",
-            "env_variable": "EMPTY_SERVER_ENABLED",
             "default_value": "0",
             "user_viewable": true,
             "user_editable": true,

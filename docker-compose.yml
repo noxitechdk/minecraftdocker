@@ -1,10 +1,4 @@
 services:
-  java7:
-    build:
-      context: ./java
-      dockerfile: ./7/Dockerfile
-    image: ghcr.io/noxitechdk/minecraftdocker:java7
-
   java8:
     build:
       context: ./java

@@ -41,47 +41,6 @@ else
 	echo -e "${LOG_PREFIX} Skipping malware scan..."
 fi
 
-# Auto-install Empty Server plugin (only if enabled)
-if [[ "${EMPTY_SERVER_ENABLED:-0}" == "1" ]]; then
-	echo -e "${LOG_PREFIX} Installing Empty Server plugin..."
-
-	mkdir -p plugins
-
-	EMPTY_SERVER_INSTALLED=false
-
-	if [[ -f "/emptyserver.jar" ]]; then
-		echo -e "${LOG_PREFIX} Found static Empty Server plugin, installing..."
-		cp /emptyserver.jar plugins/emptyserver.jar
-		EMPTY_SERVER_INSTALLED=true
-	fi
-
-	echo -e "${LOG_PREFIX} Checking for latest Empty Server version from GitHub..."
-
-	LATEST_URL=$(curl -s "https://api.github.com/repos/Stadric/emptyServer/releases/latest" | grep "browser_download_url.*\.jar" | head -n 1 | cut -d '"' -f 4)
-
-	if [[ -n "$LATEST_URL" ]]; then
-		echo -e "${LOG_PREFIX} Downloading latest Empty Server plugin from: $LATEST_URL"
-
-		if curl -sL "$LATEST_URL" -o /tmp/emptyserver-latest.jar; then
-			mv /tmp/emptyserver-latest.jar plugins/emptyserver.jar
-			echo -e "${LOG_PREFIX} Latest Empty Server plugin installed successfully"
-			EMPTY_SERVER_INSTALLED=true
-		else
-			echo -e "${LOG_PREFIX} Failed to download latest version, using static version if available"
-		fi
-	else
-		echo -e "${LOG_PREFIX} Could not fetch latest release info, using static version if available"
-	fi
-
-	if [[ "$EMPTY_SERVER_INSTALLED" == "true" ]]; then
-		echo -e "${LOG_PREFIX} Empty Server plugin installation completed"
-	else
-		echo -e "${LOG_PREFIX} No Empty Server plugin found to install"
-	fi
-else
-	echo -e "${LOG_PREFIX} Empty Server plugin installation disabled (EMPTY_SERVER_ENABLED=0)"
-fi
-
 # Auto-install Hibernate plugin (only if enabled)
 if [[ "${HIBERNATE_ENABLED:-1}" == "1" ]]; then
 	echo -e "${LOG_PREFIX} Installing Hibernate plugin..."
