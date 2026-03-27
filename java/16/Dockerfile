@@ -1,6 +1,6 @@
 FROM        --platform=$TARGETOS/$TARGETARCH eclipse-temurin:16-jdk-focal
 
-LABEL       author="Robert Jansen" maintainer="NuXiCloud"
+LABEL       author="Robert Jansen" maintainer="NoXi"
 
 LABEL       org.opencontainers.image.source="https://github.com/noxitechdk/minecraftdocker"
 LABEL       org.opencontainers.image.licenses=MIT

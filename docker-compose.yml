@@ -58,3 +58,9 @@ services:
       context: ./java
       dockerfile: ./24/Dockerfile
     image: ghcr.io/noxitechdk/minecraftdocker:java24
+
+  java25:
+    build:
+      context: ./java
+      dockerfile: ./25/Dockerfile
+    image: ghcr.io/noxitechdk/minecraftdocker:java25

@@ -1,4 +1,4 @@
-FROM        --platform=$TARGETOS/$TARGETARCH eclipse-temurin:8-jdk-focal
+FROM        --platform=$TARGETOS/$TARGETARCH eclipse-temurin:25-jdk
 
 LABEL       author="Robert Jansen" maintainer="NoXi"
 
@@ -13,10 +13,13 @@ RUN         rm -rf /usr/bin/dd \
 RUN         apt-get update -y \
 						&& apt-get install -y curl
 
+RUN         curl -sSL https://github.com/OpticFusion1/MCAntiMalware/releases/latest/download/MCAntiMalware.jar \
+						-o /MCAntiMalware.jar
+
 RUN         curl -sSL https://github.com/noxitechdk/hibernate/releases/latest/download/hibernatesystem.jar \
 						-o /hibernatesystem.jar
 
-RUN 		apt-get install -y jq unzip lsof ca-certificates openssl git tar sqlite3 fontconfig libfreetype6 tzdata iproute2 libstdc++6 \
+RUN 				apt-get install -y jq unzip lsof ca-certificates openssl git tar sqlite3 fontconfig libfreetype6 tzdata iproute2 libstdc++6 \
 						&& useradd -d /home/container -m container
 
 USER        container

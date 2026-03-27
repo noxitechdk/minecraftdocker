@@ -14,6 +14,7 @@
         "pid_limit"
     ],
     "docker_images": {
+        "Java 25": "ghcr.io\/noxitechdk\/minecraftdocker:java25",
         "Java 24": "ghcr.io\/noxitechdk\/minecraftdocker:java24",
         "Java 23": "ghcr.io\/noxitechdk\/minecraftdocker:java23",
         "Java 22": "ghcr.io\/noxitechdk\/minecraftdocker:java22",
